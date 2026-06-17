@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Statistical Analyzer — Time Series &amp; Cross Section</title>
+<style>
+:root{
+  --ink:#1a1a1a; --navy:#1f3a5f; --navy2:#6e87a8; --burg:#8b1a1a; --burg2:#c08484;
+  --olive:#5a6b3b; --gold:#9a7b2d; --hair:#d8d4cc; --paper:#ffffff;
+}
+*{box-sizing:border-box;}
+html,body{margin:0; padding:0; background:var(--paper); color:var(--ink);
+  font-family:"Times New Roman", Times, "Malgun Gothic", serif; font-size:15.5px; line-height:1.62;}
+
+/* ---------- layout: fixed sidebar + content ---------- */
+#side{position:fixed; top:0; left:0; bottom:0; width:248px; border-right:1px solid var(--hair);
+  padding:26px 20px; overflow-y:auto; background:#fdfcfa;}
+#main{margin-left:248px; max-width:1080px; padding:34px 44px 90px;}
+#side h1{font-size:19px; margin:0 0 2px; letter-spacing:.2px;}
+#side .sub{font-style:italic; color:#777; font-size:12.5px; margin-bottom:20px;}
+#side .grp{font-size:11px; letter-spacing:2.2px; color:#999; margin:16px 0 5px; text-transform:uppercase;}
+#side a{display:block; color:var(--ink); text-decoration:none; padding:4px 8px; font-size:14px; border-left:2.5px solid transparent;}
+#side a:hover{color:var(--burg);}
+#side a.on{color:var(--burg); font-weight:bold; border-left-color:var(--burg); background:#f6f1ef;}
+#side .src{margin-top:26px; padding-top:14px; border-top:1px solid var(--hair); font-size:12px; color:#888; font-style:italic;}
+
+/* ---------- typography ---------- */
+.masthead{border-top:3px double var(--ink); border-bottom:1px solid var(--ink); padding:14px 2px 12px; margin-bottom:30px;}
+.masthead h1{font-size:27px; margin:0; font-weight:bold;}
+.masthead .meta{font-style:italic; color:#666; font-size:13.5px; margin-top:4px;}
+section{margin-bottom:42px; padding-bottom:30px; border-bottom:1px solid var(--hair);}
+h2{font-size:21px; margin:0 0 10px; border-bottom:1.5px solid var(--ink); padding-bottom:6px;}
+h2 .no{color:var(--burg); margin-right:9px;}
+h3{font-size:16.5px; margin:20px 0 7px; color:var(--navy);}
+.lede{font-style:italic; color:#555; margin-bottom:14px; font-size:14.5px;}
+.body{margin:9px 0; text-align:justify;}
+.srcnote{font-size:12.8px; color:#777; border-left:2.5px solid var(--hair); padding-left:11px; margin:9px 0 15px; font-style:italic;}
+.tnote{font-size:12.8px; color:#777; font-style:italic; margin-top:6px;}
+
+/* ---------- controls ---------- */
+.ctrl{display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; margin:13px 0;
+  background:#faf9f6; border:1px solid var(--hair); padding:10px 14px; font-size:13.5px;}
+.ctrl label{font-weight:bold; font-size:13px;}
+select,input[type=number],input[type=text]{font-family:inherit; font-size:13.5px; padding:3px 7px;
+  border:1px solid #bbb; background:#fff;}
+input[type=number]{width:78px;}
+textarea{width:100%; height:170px; font-family:Consolas, monospace; font-size:12.5px; padding:9px;
+  border:1px solid #bbb; background:#fff; resize:vertical;}
+.btn{font-family:inherit; font-size:13.5px; padding:4px 13px; border:1px solid #999; background:#fff; cursor:pointer;}
+.btn:hover{border-color:var(--burg); color:var(--burg);}
+.btn.on{background:var(--burg); color:#fff; border-color:var(--burg);}
+.btnrow{display:flex; gap:6px; flex-wrap:wrap;}
+.chips{display:flex; gap:7px; flex-wrap:wrap;}
+.chip{border:1px solid #aaa; padding:2.5px 11px; font-size:13px; cursor:pointer; background:#fff; user-select:none;}
+.chip.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+
+/* ---------- figures & tables ---------- */
+.figure{margin:17px 0;}
+.figcap{font-size:13.5px; margin-bottom:5px;}
+.fno{color:var(--burg); font-weight:bold;}
+.fignote{font-size:12.3px; color:#888; font-style:italic; margin-top:4px;}
+canvas{width:100%; display:block; background:#fff;}
+.fig2{display:grid; grid-template-columns:1fr 1fr; gap:22px;}
+@media(max-width:980px){ .fig2{grid-template-columns:1fr;} #side{display:none;} #main{margin-left:0;} }
+.legend{display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; margin:4px 0 6px; color:#444;}
+.legend i{display:inline-block; width:20px; border-top:2.6px solid; margin-right:5px; vertical-align:middle;}
+.legend i.dash{border-top-style:dashed;}
+.tblwrap{overflow-x:auto; margin:15px 0;}
+table.tb{border-collapse:collapse; width:100%; font-size:13.6px;}
+table.tb caption{caption-side:top; text-align:left; font-size:13.5px; padding-bottom:6px;}
+.cno{color:var(--burg); font-weight:bold;}
+table.tb th{border-top:1.6px solid var(--ink); border-bottom:1px solid var(--ink); padding:6px 9px; text-align:right; font-size:12.8px;}
+table.tb th:first-child{text-align:left;}
+table.tb td{padding:5px 9px; text-align:right; border-bottom:1px solid #eceae5;}
+table.tb td:first-child{text-align:left;}
+table.tb tbody tr:hover{background:#f8f6f1;}
+table.tb .last td{border-bottom:1.6px solid var(--ink);}
+td.pos{color:var(--burg);} td.neg{color:var(--navy);}
+td.sig3{font-weight:bold;} 
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:14px 0;}
+.card{border:1px solid var(--hair); border-top:2.5px solid var(--navy); padding:10px 13px; background:#fdfcfa;}
+.card .k{font-size:11.5px; letter-spacing:1.2px; color:#888; text-transform:uppercase;}
+.card .v{font-size:21px; font-weight:bold; margin-top:2px;}
+.card .s{font-size:12px; color:#777; font-style:italic;}
+.callout{border:1px solid var(--hair); border-left:3px solid var(--gold); background:#fcfaf4; padding:11px 15px; font-size:14px; margin:13px 0;}
+ol.refs{font-size:13.8px; padding-left:22px;} ol.refs li{margin-bottom:6px;}
+.corr-cell{display:inline-block; min-width:54px;}
+.err{color:var(--burg); font-weight:bold;}
+</style>
+</head>
+<body>
+
+<nav id="side">
+  <h1>Stat Analyzer</h1>
+  <div class="sub">Stationarity · Regression · VAR · Cointegration</div>
+  <div class="grp">Data</div>
+  <a href="#sec-data" class="on">1 데이터 입력</a>
+  <div class="grp">Univariate</div>
+  <a href="#sec-desc">2 기술통계</a>
+  <a href="#sec-dist">3 분포 분석</a>
+  <a href="#sec-acf">4 정상성 · 단위근</a>
+  <a href="#sec-ts">5 시계열 · 롤링</a>
+  <div class="grp">Multivariate</div>
+  <a href="#sec-corr">6 상관분석</a>
+  <a href="#sec-ols">7 OLS 회귀</a>
+  <div class="grp">System Dynamics</div>
+  <a href="#sec-var">8 VAR · IRF · 분산분해</a>
+  <a href="#sec-granger">9 Granger 인과</a>
+  <a href="#sec-coint">10 공적분 (Engle–Granger)</a>
+  <div class="grp">Appendix</div>
+  <a href="#sec-method">11 방법론 · 참고문헌</a>
+  <div class="src">Pure client-side JS.<br>No data leaves the browser.</div>
+</nav>
+
+<div id="main">
+<div class="masthead">
+  <h1>Statistical Analyzer</h1>
+  <div class="meta" id="headmeta">데이터를 입력하면 모든 섹션이 자동 계산됩니다.</div>
+</div>
+
+<!-- ============ 1. DATA ============ -->
+<section id="sec-data">
+  <h2><span class="no">1.</span>데이터 입력 — Paste or Upload</h2>
+  <div class="lede">Excel에서 범위를 복사해 그대로 붙여넣거나(탭 구분), CSV 파일을 업로드. 첫 행 = 변수명, 첫 열이 날짜(YYYY-MM-DD 등)면 자동으로 시계열 축으로 인식.</div>
+  <textarea id="dataIn" placeholder="date&#9;y10&#9;y3&#9;cpi
+2024-01-02&#9;3.31&#9;3.25&#9;3.2
+2024-01-03&#9;3.28&#9;3.22&#9;3.2
+..."></textarea>
+  <div class="ctrl">
+    <button class="btn" id="btnParse">데이터 적용</button>
+    <input type="file" id="fileIn" accept=".csv,.txt,.tsv" style="font-size:13px;">
+    <button class="btn" id="btnSample">샘플 데이터 (AR(1) 2변수 + 추세)</button>
+    <span id="parseMsg" style="font-size:13px;"></span>
+  </div>
+  <div class="tblwrap"><table class="tb" id="tbPreview"></table></div>
+</section>
+
+<!-- ============ 2. DESCRIPTIVE ============ -->
+<section id="sec-desc">
+  <h2><span class="no">2.</span>기술통계 — Descriptive Statistics</h2>
+  <div class="lede">변수별 적률(moments)과 분위수, 정규성 검정. 수익률·스프레드 분석의 출발점.</div>
+  <p class="srcnote"><b>Note:</b> Jarque–Bera 검정통계량 JB = n/6·[S² + (K−3)²/4] ~ χ²(2). 금융 시계열의 두꺼운 꼬리(excess kurtosis)는 정형화된 사실 — cf. Cont (2001), "Empirical Properties of Asset Returns," <i>Quantitative Finance</i>.</p>
+  <div class="ctrl">
+    <label><input type="checkbox" id="descDiff"> 1차 차분 기준으로 계산</label>
+  </div>
+  <div class="tblwrap"><table class="tb" id="tbDesc">
+    <caption><span class="cno">Table 1.</span> 변수별 기술통계</caption>
+  </table></div>
+</section>
+
+<!-- ============ 3. DISTRIBUTION ============ -->
+<section id="sec-dist">
+  <h2><span class="no">3.</span>분포 분석 — Histogram &amp; Q–Q Plot</h2>
+  <div class="lede">히스토그램 + 정규분포 오버레이, 그리고 정규 Q–Q plot으로 꼬리 두께를 시각 점검.</div>
+  <div class="ctrl">
+    <label>변수:</label><select id="distVar"></select>
+    <label><input type="checkbox" id="distDiff"> 1차 차분</label>
+    <label>빈(bin) 수:</label><input type="number" id="distBins" value="30" min="8" max="120" step="2">
+  </div>
+  <div class="fig2">
+    <div class="figure"><div class="figcap"><b><span class="fno">Figure 1a.</span></b> 히스토그램 vs 정규분포</div><div class="legend" id="lgD1"></div><canvas id="figHist" height="330"></canvas></div>
+    <div class="figure"><div class="figcap"><b><span class="fno">Figure 1b.</span></b> Normal Q–Q plot</div><canvas id="figQQ" height="330"></canvas><div class="fignote">대각선 위 = 정규. S자형 이탈 = fat tails.</div></div>
+  </div>
+</section>
+
+<!-- ============ 4. STATIONARITY (moved up) ============ -->
+<section id="sec-acf">
+  <h2><span class="no">4.</span>정상성 · 단위근 — ACF, PACF, ADF</h2>
+  <div class="lede"><b>시계열 분석의 출발점.</b> 회귀·상관·VAR에 앞서 각 변수가 정상(stationary)인지 먼저 확인해야 한다 — 비정상 변수를 레벨로 회귀하면 가성회귀(spurious regression)가 된다. ACF가 천천히 감쇠하면 단위근 의심 → ADF로 확정. 비정상이면 차분하거나(VAR), 공적분을 점검한다(§10).</div>
+  <p class="srcnote"><b>Sources:</b> Dickey &amp; Fuller (1979), <i>JASA</i>; MacKinnon (1996) 임계값. 평균회귀 속도는 반감기 ln(0.5)/ln(φ)로 요약. 분석 워크플로우 순서는 Enders, <i>Applied Econometric Time Series</i> (Wiley) 표준을 따른다.</p>
+  <div class="ctrl">
+    <label>변수:</label><select id="acfVar"></select>
+    <label><input type="checkbox" id="acfDiff"> 1차 차분</label>
+    <label>최대 시차:</label><input type="number" id="acfLags" value="30" min="5" max="120">
+    <label>ADF 시차:</label><input type="number" id="adfLags" value="5" min="0" max="30">
+  </div>
+  <div class="fig2">
+    <div class="figure"><div class="figcap"><b><span class="fno">Figure 1a.</span></b> ACF (±1.96/√n 밴드)</div><canvas id="figACF" height="300"></canvas></div>
+    <div class="figure"><div class="figcap"><b><span class="fno">Figure 1b.</span></b> PACF</div><canvas id="figPACF" height="300"></canvas></div>
+  </div>
+  <div class="cards" id="acfCards"></div>
+  <div class="callout" id="adfOut"></div>
+  <h3>전 변수 단위근 요약</h3>
+  <p class="tnote">레벨과 1차 차분 각각에 대해 ADF를 일괄 적용. 레벨에서 단위근 기각 못 함 + 차분에서 기각 = I(1) → VAR은 차분, 또는 공적분(§10) 점검.</p>
+  <div class="tblwrap"><table class="tb" id="tbADFall">
+    <caption><span class="cno">Table 1.</span> 변수별 ADF 단위근 검정 (상수항 포함)</caption>
+  </table></div>
+</section>
+
+<!-- ============ 5. TIME SERIES ============ -->
+<section id="sec-ts">
+  <h2><span class="no">5.</span>시계열 · 롤링 통계 — Level, Rolling Mean / Vol / Z</h2>
+  <div class="lede">레벨 추이와 롤링 평균·변동성·z-score. 윈도우는 자유 조정 (일별 데이터 기준 21=1M, 63=3M, 250=1Y).</div>
+  <div class="ctrl">
+    <label>변수:</label><select id="tsVar"></select>
+    <label>롤링 윈도우:</label><input type="number" id="tsWin" value="63" min="5" max="2000" step="1">
+    <label>표시:</label>
+    <div class="btnrow" id="tsModeBtns">
+      <button class="btn on" data-m="level">레벨+롤링평균</button>
+      <button class="btn" data-m="vol">롤링 변동성(σ of Δ)</button>
+      <button class="btn" data-m="z">롤링 Z-score</button>
+    </div>
+  </div>
+  <div class="figure">
+    <div class="figcap"><b><span class="fno">Figure 2.</span></b> <span id="tsCap">시계열과 롤링 평균</span></div>
+    <div class="legend" id="lgTS"></div>
+    <canvas id="figTS" height="360"></canvas>
+  </div>
+</section>
+
+<!-- ============ 5. CORRELATION ============ -->
+<section id="sec-corr">
+  <h2><span class="no">6.</span>상관분석 — Correlation Matrix</h2>
+  <div class="lede">레벨 상관은 공통 추세에 의해 과대평가되기 쉬우므로, 시계열이면 차분 상관을 기본으로 권장.</div>
+  <p class="srcnote"><b>Note:</b> 비정상(non-stationary) 시계열 간 레벨 회귀·상관은 가성적(spurious) 관계를 낳는다 — Granger &amp; Newbold (1974), "Spurious Regressions in Econometrics," <i>Journal of Econometrics</i>.</p>
+  <div class="ctrl">
+    <label>기준:</label>
+    <div class="btnrow" id="corrModeBtns">
+      <button class="btn" data-m="level">레벨</button>
+      <button class="btn on" data-m="diff">1차 차분</button>
+    </div>
+  </div>
+  <div class="tblwrap"><table class="tb" id="tbCorr">
+    <caption><span class="cno">Table 2.</span> Pearson 상관행렬 (하삼각, 대각=1)</caption>
+  </table></div>
+  <p class="tnote">|ρ| ≥ 0.7 적색 강조, 0.4–0.7 음영. 표본 수가 다른 변수쌍은 pairwise-complete로 계산.</p>
+</section>
+
+<!-- ============ 6. OLS ============ -->
+<section id="sec-ols">
+  <h2><span class="no">7.</span>OLS 회귀 — Multiple Regression</h2>
+  <div class="lede">종속변수 1개, 설명변수 다수 선택. 계수·t·p, R², Durbin–Watson, 잔차 진단까지 한 번에.</div>
+  <p class="srcnote"><b>Sources:</b> 시계열 잔차의 자기상관·이분산 하에서 통상 SE는 과소평가됨 — Newey &amp; West (1987), <i>Econometrica</i>. HAC 옵션 체크 시 Bartlett 커널 (lag = ⌊4(n/100)^(2/9)⌋) 적용.</p>
+  <div class="ctrl">
+    <label>Y:</label><select id="olsY"></select>
+    <label>X (복수 선택):</label><div class="chips" id="olsXChips"></div>
+    <label><input type="checkbox" id="olsDiff"> 전 변수 1차 차분</label>
+    <label><input type="checkbox" id="olsHAC"> Newey–West HAC SE</label>
+    <button class="btn" id="btnOLS">회귀 실행</button>
+  </div>
+  <div class="cards" id="olsCards"></div>
+  <div class="tblwrap"><table class="tb" id="tbOLS">
+    <caption><span class="cno">Table 3.</span> 회귀계수 추정 결과</caption>
+  </table></div>
+  <div class="fig2">
+    <div class="figure"><div class="figcap"><b><span class="fno">Figure 3a.</span></b> 실제 vs 적합값</div><div class="legend" id="lgO1"></div><canvas id="figOLSFit" height="320"></canvas></div>
+    <div class="figure"><div class="figcap"><b><span class="fno">Figure 3b.</span></b> 잔차 시계열</div><canvas id="figOLSResid" height="320"></canvas><div class="fignote">잔차의 군집(clustering)은 자기상관·변동성 군집 신호.</div></div>
+  </div>
+</section>
+
+<!-- ============ 8. VAR / IRF / FEVD ============ -->
+<section id="sec-var">
+  <h2><span class="no">8.</span>VAR · 충격반응 · 분산분해 — Vector Autoregression</h2>
+  <div class="lede">다변수 동태 시스템. 변수 2–4개와 시차 p를 선택하면 축약형 VAR(p)를 방정식별 OLS로 추정하고, 직교화 충격반응함수(IRF)와 예측오차 분산분해(FEVD)를 계산한다. <b>VAR은 정상 변수에 적용</b>하므로, §4에서 I(1)로 판정된 변수는 차분 옵션을 켜고 분석할 것.</div>
+  <p class="srcnote"><b>Sources:</b> Sims (1980), "Macroeconomics and Reality," <i>Econometrica</i> 48(1) — VAR의 원전; 직교화 IRF는 잔차 공분산의 Cholesky 분해를 사용하므로 <b>변수 순서(ordering)에 의존</b>한다 — 위에 둔 변수일수록 동시점에 외생적(Hamilton, <i>Time Series Analysis</i>, 1994, ch.11).</p>
+  <div class="ctrl">
+    <label>변수 선택 (2–4개):</label><div class="chips" id="varChips"></div>
+    <label>시차 p:</label><input type="number" id="varP" value="2" min="1" max="8">
+    <label><input type="checkbox" id="varDiff"> 전 변수 1차 차분</label>
+    <label>IRF 기간:</label><input type="number" id="varH" value="20" min="5" max="60">
+    <button class="btn" id="btnVAR">VAR 추정</button>
+  </div>
+  <div class="cards" id="varCards"></div>
+  <p class="tnote">Cholesky 순서 = 선택한 변수 순서(좌→우). 순서를 바꾸려면 칩을 다시 클릭(해제 후 원하는 순서로 재선택).</p>
+  <div class="tblwrap"><table class="tb" id="tbVAR">
+    <caption><span class="cno">Table 5.</span> VAR 계수 — 방정식별 (행=종속, 열=설명)</caption>
+  </table></div>
+  <h3>충격반응함수 (Orthogonalized IRF)</h3>
+  <p class="body">각 패널은 한 변수에 1 표준편차 충격이 가해졌을 때 시스템 변수들의 동태 반응 경로다. ±2 S.E. 밴드는 해석적 근사(Lütkepohl)로 표시. 반응이 0으로 수렴하면 안정적 시스템이다.</p>
+  <div id="irfGrid" class="fig2" style="grid-template-columns:1fr 1fr;"></div>
+  <h3>예측오차 분산분해 (FEVD)</h3>
+  <p class="body">각 변수의 h-기 예측오차 분산을 어느 충격이 몇 % 설명하는지 분해. 자기 충격 비중이 높으면 외생적, 타 변수 비중이 높으면 시스템 내생적이다.</p>
+  <div class="ctrl"><label>분해 시점 h:</label><input type="number" id="fevdH" value="10" min="1" max="60"></div>
+  <div class="tblwrap"><table class="tb" id="tbFEVD">
+    <caption><span class="cno">Table 6.</span> FEVD — 행=대상변수, 열=충격원천 (%)</caption>
+  </table></div>
+</section>
+
+<!-- ============ 9. GRANGER ============ -->
+<section id="sec-granger">
+  <h2><span class="no">9.</span>Granger 인과 — Granger Causality</h2>
+  <div class="lede">"X의 과거가 Y의 미래 예측에 도움이 되는가"를 검정한다. 인과(causation)가 아니라 <b>예측적 선행성</b>임에 유의. 모든 변수쌍 방향별로 F-검정을 일괄 수행.</div>
+  <p class="srcnote"><b>Sources:</b> Granger (1969), "Investigating Causal Relations by Econometric Models and Cross-spectral Methods," <i>Econometrica</i> 37(3). 제한·비제한 모형의 SSR로 F = [(SSR_r−SSR_u)/p] / [SSR_u/(n−2p−1)] ~ F(p, n−2p−1). 비정상 변수는 차분 후 검정 권장(Toda–Yamamoto 대안도 존재).</p>
+  <div class="ctrl">
+    <label>시차 p:</label><input type="number" id="grangerP" value="2" min="1" max="8">
+    <label><input type="checkbox" id="grangerDiff"> 전 변수 1차 차분</label>
+    <label>유의수준:</label><select id="grangerAlpha"><option value="0.05">5%</option><option value="0.01">1%</option><option value="0.1">10%</option></select>
+  </div>
+  <div class="tblwrap"><table class="tb" id="tbGranger">
+    <caption><span class="cno">Table 7.</span> Granger 인과 검정 — 행(원인) → 열(결과), F-통계량 / p값</caption>
+  </table></div>
+  <div class="callout" id="grangerOut"></div>
+</section>
+
+<!-- ============ 10. COINTEGRATION ============ -->
+<section id="sec-coint">
+  <h2><span class="no">10.</span>공적분 — Engle–Granger 2단계</h2>
+  <div class="lede">두 비정상 I(1) 변수가 장기적으로 함께 움직이는가(공적분)를 본다. 공적분되면 레벨 관계가 가성적이지 않고, 단기 이탈은 오차수정(ECM)으로 회귀한다 — 페어트레이딩·헤지비율의 통계적 근거.</div>
+  <p class="srcnote"><b>Sources:</b> Engle &amp; Granger (1987), "Co-integration and Error Correction," <i>Econometrica</i> 55(2). 1단계: Y = α + βX 회귀로 잔차 추정. 2단계: 잔차에 ADF — 단위근 기각 시 공적분. 임계값은 일반 ADF보다 엄격(Engle–Granger 임계값 사용).</p>
+  <div class="ctrl">
+    <label>Y:</label><select id="coY"></select>
+    <label>X:</label><select id="coX"></select>
+    <label>ADF 시차:</label><input type="number" id="coLags" value="3" min="0" max="20">
+    <button class="btn" id="btnCoint">공적분 검정</button>
+  </div>
+  <div class="cards" id="coCards"></div>
+  <div class="figure">
+    <div class="figcap"><b><span class="fno">Figure 6.</span></b> 공적분 잔차 (장기균형 이탈) — 평균회귀하면 공적분</div>
+    <canvas id="figCoint" height="320"></canvas>
+    <div class="fignote">잔차가 0 주위로 회귀하면 두 변수는 장기균형을 공유. β = 헤지비율(Y 1단위당 X β단위).</div>
+  </div>
+  <div class="callout" id="coOut"></div>
+</section>
+
+<!-- ============ 11. METHOD ============ -->
+<section id="sec-method" style="border-bottom:none;">
+  <h2><span class="no">11.</span>방법론 · 참고문헌</h2>
+  <h3>분석 순서 (권장 워크플로우)</h3>
+  <p class="body">① 기술통계·분포로 데이터 성격 파악 → ② <b>단위근 검정으로 정상성 확인</b> → ③ 정상이면 레벨, I(1)이면 차분으로 상관·회귀 → ④ 다변수 동태는 VAR(정상화 후) → ⑤ I(1) 변수쌍은 공적분 점검 후 공적분되면 레벨 VECM, 아니면 차분 VAR. 이 순서는 비정상 시계열의 가성회귀를 피하기 위한 표준 절차다(Enders 2014).</p>
+  <h3>구현</h3>
+  <p class="body">모든 계산은 브라우저 내 순수 JavaScript로 수행되며 데이터는 외부로 전송되지 않는다. OLS·VAR는 정규방정식 (X′X)⁻¹X′y를 가우스 소거로 풀고, t·F p값은 불완전 베타함수 연분수 전개로 계산한다. PACF는 Durbin–Levinson, ADF는 상수항 포함 사양. VAR IRF는 잔차 공분산의 Cholesky 분해로 직교화하며, FEVD는 직교화 IRF 제곱 누적비율로 계산한다.</p>
+  <h3>References</h3>
+  <ol class="refs">
+    <li>Sims, C. A. (1980). "Macroeconomics and Reality." <i>Econometrica</i> 48(1), 1–48.</li>
+    <li>Granger, C. W. J. (1969). "Investigating Causal Relations by Econometric Models and Cross-spectral Methods." <i>Econometrica</i> 37(3), 424–438.</li>
+    <li>Engle, R. F. and C. W. J. Granger (1987). "Co-integration and Error Correction: Representation, Estimation, and Testing." <i>Econometrica</i> 55(2), 251–276.</li>
+    <li>Dickey, D. A. and W. A. Fuller (1979). "Distribution of the Estimators for Autoregressive Time Series with a Unit Root." <i>JASA</i> 74, 427–431.</li>
+    <li>MacKinnon, J. G. (1996). "Numerical Distribution Functions for Unit Root and Cointegration Tests." <i>Journal of Applied Econometrics</i> 11, 601–618.</li>
+    <li>Newey, W. K. and K. D. West (1987). "A Simple, Positive Semi-definite, HAC Covariance Matrix." <i>Econometrica</i> 55(3), 703–708.</li>
+    <li>Granger, C. W. J. and P. Newbold (1974). "Spurious Regressions in Econometrics." <i>Journal of Econometrics</i> 2(2), 111–120.</li>
+    <li>Hamilton, J. D. (1994). <i>Time Series Analysis</i>. Princeton University Press.</li>
+    <li>Lütkepohl, H. (2005). <i>New Introduction to Multiple Time Series Analysis</i>. Springer.</li>
+  </ol>
+</section>
+</div>
+
+<script>
+/* ============================================================ core */
+const FONT='"Times New Roman", Times, serif';
+const C={navy:'#1f3a5f',navy2:'#6e87a8',burg:'#8b1a1a',burg2:'#c08484',olive:'#5a6b3b',gold:'#9a7b2d',hair:'#d8d4cc'};
+const fmt=(v,d=3)=> v==null||isNaN(v)?'–':(+v).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+let D={cols:[],vals:{},dates:null,n:0,isTS:false};
+
+function clean(a){return a.filter(v=>v!=null&&!isNaN(v));}
+function mean(a){const v=clean(a);return v.reduce((s,x)=>s+x,0)/v.length;}
+function sd(a){const v=clean(a);const m=mean(v);return Math.sqrt(v.reduce((s,x)=>s+(x-m)**2,0)/(v.length-1));}
+function skew(a){const v=clean(a),m=mean(v),s=sd(v),n=v.length;return v.reduce((q,x)=>q+((x-m)/s)**3,0)*n/((n-1)*(n-2));}
+function kurt(a){const v=clean(a),m=mean(v),s=sd(v),n=v.length;
+  return v.reduce((q,x)=>q+((x-m)/s)**4,0)*n*(n+1)/((n-1)*(n-2)*(n-3))-3*(n-1)**2/((n-2)*(n-3));}
+function quant(a,p){const v=clean(a).slice().sort((x,y)=>x-y);const i=(v.length-1)*p,lo=Math.floor(i);
+  return v[lo]+(v[Math.min(lo+1,v.length-1)]-v[lo])*(i-lo);}
+function diff(a){const o=[null];for(let i=1;i<a.length;i++)o.push(a[i]==null||a[i-1]==null?null:a[i]-a[i-1]);return o;}
+function movavg(a,w){const o=new Array(a.length).fill(null);let q=[],s=0;
+  for(let i=0;i<a.length;i++){const v=a[i];if(v==null){q=[];s=0;o[i]=null;continue;}
+    q.push(v);s+=v;if(q.length>w)s-=q.shift();if(q.length===w)o[i]=s/w;}return o;}
+function rollsd(a,w){const o=new Array(a.length).fill(null);
+  for(let i=w-1;i<a.length;i++){const seg=a.slice(i-w+1,i+1);if(seg.some(v=>v==null))continue;o[i]=sd(seg);}return o;}
+/* normal quantile (Acklam) & cdf */
+function qnorm(p){const a=[-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00],
+b=[-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01],
+c=[-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00],
+d=[7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
+const pl=0.02425;let q,r;
+if(p<pl){q=Math.sqrt(-2*Math.log(p));return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+if(p<=1-pl){q=p-0.5;r=q*q;return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);}
+q=Math.sqrt(-2*Math.log(1-p));return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+function pnorm(x){return 0.5*(1+erf(x/Math.SQRT2));}
+function erf(x){const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);
+const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return s*y;}
+/* incomplete beta -> t-dist two-sided p */
+function betacf(a,b,x){let m2,aa,cz,dz,del,h,qab=a+b,qap=a+1,qam=a-1;cz=1;dz=1-qab*x/qap;
+if(Math.abs(dz)<1e-30)dz=1e-30;dz=1/dz;h=dz;
+for(let m=1;m<=200;m++){m2=2*m;aa=m*(b-m)*x/((qam+m2)*(a+m2));dz=1+aa*dz;if(Math.abs(dz)<1e-30)dz=1e-30;
+cz=1+aa/cz;if(Math.abs(cz)<1e-30)cz=1e-30;dz=1/dz;h*=dz*cz;
+aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));dz=1+aa*dz;if(Math.abs(dz)<1e-30)dz=1e-30;
+cz=1+aa/cz;if(Math.abs(cz)<1e-30)cz=1e-30;dz=1/dz;del=dz*cz;h*=del;
+if(Math.abs(del-1)<3e-9)break;}return h;}
+function gammaln(x){const g=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];
+let y=x,t=x+5.5;t-=(x+0.5)*Math.log(t);let ser=1.000000000190015;
+for(let j=0;j<6;j++)ser+=g[j]/++y;return -t+Math.log(2.5066282746310005*ser/x);}
+function ibeta(a,b,x){if(x<=0)return 0;if(x>=1)return 1;
+const bt=Math.exp(gammaln(a+b)-gammaln(a)-gammaln(b)+a*Math.log(x)+b*Math.log(1-x));
+return x<(a+1)/(a+b+2)? bt*betacf(a,b,x)/a : 1-bt*betacf(b,a,1-x)/b;}
+function tPval(t,df){return ibeta(df/2,0.5,df/(df+t*t));} // two-sided
+function chi2Pval(x,k){ // upper tail via regularized gamma (series/cf via ibeta relation approx)
+  // use Wilson–Hilferty approximation, fine for JB reporting
+  const z=( Math.cbrt(x/k) -(1-2/(9*k)) )/Math.sqrt(2/(9*k)); return 1-pnorm(z);}
+/* OLS with optional Newey-West */
+function gaussSolve(A,bv){const n=A.length,M=A.map((r,i)=>[...r,...bv[i]??[bv[i]]]);
+  // bv may be vector
+  const m=A.map((r,i)=>[...r, Array.isArray(bv[0])?0:bv[i]]);
+  for(let c=0;c<n;c++){let p=c;for(let r=c+1;r<n;r++)if(Math.abs(m[r][c])>Math.abs(m[p][c]))p=r;
+    [m[c],m[p]]=[m[p],m[c]];const pv=m[c][c];
+    for(let r=0;r<n;r++){if(r===c)continue;const f=m[r][c]/pv;for(let k=c;k<=n;k++)m[r][k]-=f*m[c][k];}}
+  return m.map((r,i)=>r[n]/r[i]);}
+function matInv(A){const n=A.length,M=A.map((r,i)=>[...r,...Array.from({length:n},(_,j)=>i===j?1:0)]);
+  for(let c=0;c<n;c++){let p=c;for(let r=c+1;r<n;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;
+    [M[c],M[p]]=[M[p],M[c]];const pv=M[c][c];
+    for(let k=c;k<2*n;k++)M[c][k]/=pv;
+    for(let r=0;r<n;r++){if(r===c)continue;const f=M[r][c];for(let k=c;k<2*n;k++)M[r][k]-=f*M[c][k];}}
+  return M.map(r=>r.slice(n));}
+function ols(yArr,Xcols,hac){ // Xcols: array of arrays (no const). returns full result
+  const n0=yArr.length;const rows=[];
+  for(let i=0;i<n0;i++){if(yArr[i]==null||isNaN(yArr[i]))continue;
+    if(Xcols.some(c=>c[i]==null||isNaN(c[i])))continue;rows.push(i);}
+  const n=rows.length,k=Xcols.length+1;
+  if(n<k+3)return null;
+  const X=rows.map(i=>[1,...Xcols.map(c=>c[i])]);
+  const y=rows.map(i=>yArr[i]);
+  const XtX=Array.from({length:k},(_,a)=>Array.from({length:k},(_,b)=>X.reduce((s,r)=>s+r[a]*r[b],0)));
+  const Xty=Array.from({length:k},(_,a)=>X.reduce((s,r,i)=>s+r[a]*y[i],0));
+  const XtXi=matInv(XtX);
+  const beta=XtXi.map(r=>r.reduce((s,v,j)=>s+v*Xty[j],0));
+  const fit=X.map(r=>r.reduce((s,v,j)=>s+v*beta[j],0));
+  const res=y.map((v,i)=>v-fit[i]);
+  const sse=res.reduce((s,e)=>s+e*e,0);
+  const ybar=mean(y), sst=y.reduce((s,v)=>s+(v-ybar)**2,0);
+  const r2=1-sse/sst, ar2=1-(1-r2)*(n-1)/(n-k);
+  const s2=sse/(n-k);
+  let Vb;
+  if(!hac){ Vb=XtXi.map(r=>r.map(v=>v*s2)); }
+  else{ // Newey-West, Bartlett kernel
+    const L=Math.floor(4*Math.pow(n/100,2/9));
+    const k_=k;
+    const S=Array.from({length:k_},()=>new Array(k_).fill(0));
+    for(let i=0;i<n;i++)for(let a=0;a<k_;a++)for(let b=0;b<k_;b++)S[a][b]+=res[i]*res[i]*X[i][a]*X[i][b];
+    for(let l=1;l<=L;l++){const w=1-l/(L+1);
+      for(let i=l;i<n;i++)for(let a=0;a<k_;a++)for(let b=0;b<k_;b++){
+        const g=res[i]*res[i-l]*(X[i][a]*X[i-l][b]+X[i-l][a]*X[i][b]);S[a][b]+=w*g;}}
+    const tmp=XtXi.map(r=>r.map((_,j)=>r.reduce((s,v,m)=>s+v*S[m][j],0)));
+    Vb=tmp.map((r,a)=>r.map((_,b)=>r.reduce((s,v,m)=>s+v*XtXi[m][b],0)));
+  }
+  const se=beta.map((_,j)=>Math.sqrt(Math.max(Vb[j][j],0)));
+  const tst=beta.map((b,j)=>b/se[j]);
+  const pv=tst.map(t=>tPval(Math.abs(t),n-k));
+  // Durbin-Watson
+  let dw=0,den=0;for(let i=1;i<n;i++)dw+=(res[i]-res[i-1])**2;den=sse;dw=dw/den;
+  return {beta,se,t:tst,p:pv,r2,ar2,n,k,dw,res,fit,rows,sig:Math.sqrt(s2)};
+}
+function acf(a,L){const v=clean(a),n=v.length,m=mean(v);
+  const c0=v.reduce((s,x)=>s+(x-m)**2,0)/n;const out=[1];
+  for(let l=1;l<=L;l++){let c=0;for(let i=l;i<n;i++)c+=(v[i]-m)*(v[i-l]-m);out.push(c/n/c0);}return out;}
+function pacf(r,L){ // Durbin-Levinson from acf array r (r[0]=1)
+  const phi=[[ ]];const out=[];let prev=[];
+  for(let k=1;k<=L;k++){let num=r[k];for(let j=1;j<k;j++)num-=prev[j-1]*r[k-j];
+    let den=1;for(let j=1;j<k;j++)den-=prev[j-1]*r[j];
+    const pk=num/den;const cur=new Array(k);cur[k-1]=pk;
+    for(let j=1;j<k;j++)cur[j-1]=prev[j-1]-pk*prev[k-1-j];
+    out.push(pk);prev=cur;}return out;}
+function adf(a,p){ // constant, p lags. returns {t, n, gamma, crit}
+  const v=clean(a),n0=v.length;
+  const dy=[];for(let i=1;i<n0;i++)dy.push(v[i]-v[i-1]);
+  const rows=[];const Y=[];const X=[]; // X: [y_{t-1}, dy_{t-1..t-p}]
+  for(let t=p;t<dy.length;t++){
+    Y.push(dy[t]);const xr=[v[t]];for(let j=1;j<=p;j++)xr.push(dy[t-j]);X.push(xr);}
+  const cols=[];for(let j=0;j<1+p;j++)cols.push(X.map(r=>r[j]));
+  const r=ols(Y,cols,false);if(!r)return null;
+  const crit={1:-3.43,5:-2.86,10:-2.57}; // MacKinnon large-n, constant
+  const phi=1+r.beta[1];
+  const hl=(phi>0&&phi<1)?Math.log(0.5)/Math.log(phi):null;
+  return {t:r.t[1],gamma:r.beta[1],n:r.n,crit,hl};}
+function fPval(F,d1,d2){ if(F<=0||!isFinite(F))return 1; return ibeta(d2/2,d1/2, d2/(d2+d1*F)); } // upper tail
+
+/* ---- multivariate helpers ---- */
+function matMul(A,B){const n=A.length,m=B[0].length,k=B.length;const R=Array.from({length:n},()=>new Array(m).fill(0));
+  for(let i=0;i<n;i++)for(let j=0;j<m;j++){let s=0;for(let l=0;l<k;l++)s+=A[i][l]*B[l][j];R[i][j]=s;}return R;}
+function transpose(A){return A[0].map((_,j)=>A.map(r=>r[j]));}
+function cholesky(A){const n=A.length,L=Array.from({length:n},()=>new Array(n).fill(0));
+  for(let i=0;i<n;i++)for(let j=0;j<=i;j++){let s=0;for(let k=0;k<j;k++)s+=L[i][k]*L[j][k];
+    if(i===j)L[i][j]=Math.sqrt(Math.max(A[i][i]-s,1e-12));else L[i][j]=(A[i][j]-s)/L[j][j];}return L;}
+/* build common-complete aligned matrix for selected vars (optionally differenced) */
+function alignedMatrix(names,useDiff){
+  const series=names.map(nm=>useDiff?diff(D.vals[nm]):D.vals[nm]);
+  const rows=[];
+  for(let i=0;i<D.n;i++){ if(series.some(s=>s[i]==null||isNaN(s[i])))continue; rows.push(series.map(s=>s[i])); }
+  return rows; // array of row-vectors, time-ordered
+}
+/* estimate VAR(p); returns coefs per equation, residuals, Sigma, fitted */
+function estimateVAR(data,p){ // data: T x k
+  const T=data.length, k=data[0].length;
+  const Y=[],X=[];
+  for(let t=p;t<T;t++){ Y.push(data[t].slice()); const xr=[1];
+    for(let l=1;l<=p;l++) for(let j=0;j<k;j++) xr.push(data[t-l][j]); X.push(xr); }
+  const n=Y.length, kc=X[0].length;
+  if(n<kc+2) return null;
+  const Xt=transpose(X), XtX=matMul(Xt,X), XtXi=matInv(XtX);
+  const B=[]; const resid=Array.from({length:n},()=>new Array(k).fill(0)); const fitted=[];
+  for(let eq=0;eq<k;eq++){ const yv=Y.map(r=>r[eq]);
+    const Xty=Xt.map(row=>row.reduce((s,v,i)=>s+v*yv[i],0));
+    const beta=XtXi.map(row=>row.reduce((s,v,j)=>s+v*Xty[j],0));
+    B.push(beta);
+    for(let i=0;i<n;i++){ const f=X[i].reduce((s,v,j)=>s+v*beta[j],0); resid[i][eq]=yv[i]-f; } }
+  // Sigma (resid cov, divide by n)
+  const Sig=Array.from({length:k},()=>new Array(k).fill(0));
+  for(let a=0;a<k;a++)for(let b=0;b<k;b++){let s=0;for(let i=0;i<n;i++)s+=resid[i][a]*resid[i][b];Sig[a][b]=s/n;}
+  return {B,resid,Sigma:Sig,n,k,p,kc};
+}
+/* companion-form IRF (orthogonalized via Cholesky), H steps */
+function varIRF(model,H){
+  const {B,Sigma,k,p}=model;
+  // coefficient matrices A_1..A_p : each k x k ; B[eq] = [const, (lag1: k), (lag2: k), ...]
+  const A=[]; for(let l=0;l<p;l++){const Al=Array.from({length:k},()=>new Array(k).fill(0));
+    for(let eq=0;eq<k;eq++)for(let j=0;j<k;j++)Al[eq][j]=B[eq][1+l*k+j]; A.push(Al);}
+  const P=cholesky(Sigma); // lower-tri
+  // Psi_0 = I ; recursively Psi_s = sum_{l=1..min(s,p)} A_l Psi_{s-l}
+  const Psi=[identity(k)];
+  for(let s=1;s<=H;s++){ let M=Array.from({length:k},()=>new Array(k).fill(0));
+    for(let l=1;l<=Math.min(s,p);l++) M=matAdd(M, matMul(A[l-1],Psi[s-l]));
+    Psi.push(M); }
+  // orthogonalized: Theta_s = Psi_s * P
+  return Psi.map(ps=>matMul(ps,P));
+}
+function identity(k){return Array.from({length:k},(_,i)=>Array.from({length:k},(_,j)=>i===j?1:0));}
+function matAdd(A,B){return A.map((r,i)=>r.map((v,j)=>v+B[i][j]));}
+/* FEVD at horizon h from orthogonalized IRF list (Theta_0..Theta_H) */
+function varFEVD(Theta,h,k){
+  const out=Array.from({length:k},()=>new Array(k).fill(0));
+  for(let i=0;i<k;i++){ const tot=new Array(k).fill(0); let denom=0;
+    for(let s=0;s<=h;s++) for(let j=0;j<k;j++){ const v=Theta[s][i][j]; tot[j]+=v*v; }
+    denom=tot.reduce((a,b)=>a+b,0);
+    for(let j=0;j<k;j++) out[i][j]= denom>0? 100*tot[j]/denom : 0; }
+  return out; // row i = variable, col j = shock share %
+}
+/* Granger: does X granger-cause Y? p lags */
+function grangerTest(yName,xName,p,useDiff){
+  const ys=useDiff?diff(D.vals[yName]):D.vals[yName];
+  const xs=useDiff?diff(D.vals[xName]):D.vals[xName];
+  const Y=[],Xr=[],Xu=[];
+  for(let t=p;t<D.n;t++){
+    let ok=true; const yl=[],xl=[];
+    if(ys[t]==null||isNaN(ys[t]))ok=false;
+    for(let j=1;j<=p&&ok;j++){ const a=ys[t-j],b=xs[t-j];
+      if(a==null||isNaN(a)||b==null||isNaN(b))ok=false; else {yl.push(a);xl.push(b);} }
+    if(!ok)continue;
+    Y.push(ys[t]); Xr.push(yl); Xu.push(yl.concat(xl));
+  }
+  const n=Y.length; if(n<2*p+2)return null;
+  const colsR=[];for(let j=0;j<p;j++)colsR.push(Xr.map(r=>r[j]));
+  const colsU=[];for(let j=0;j<2*p;j++)colsU.push(Xu.map(r=>r[j]));
+  const rR=ols(Y,colsR,false), rU=ols(Y,colsU,false); if(!rR||!rU)return null;
+  const ssrR=rR.res.reduce((s,e)=>s+e*e,0), ssrU=rU.res.reduce((s,e)=>s+e*e,0);
+  const F=((ssrR-ssrU)/p)/(ssrU/(n-2*p-1));
+  return {F, p1:p, p2:n-2*p-1, pval:fPval(F,p,n-2*p-1), n};
+}
+
+/* ============================================================ chart engine */
+function prep(cv){const dpr=window.devicePixelRatio||1;
+  if(!cv.dataset.h)cv.dataset.h=cv.getAttribute('height')||320;
+  const w=cv.clientWidth||900,h=parseInt(cv.dataset.h)||320;
+  cv.width=w*dpr;cv.height=h*dpr;cv.style.height=h+'px';const g=cv.getContext('2d');
+  g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);return{g,w,h};}
+function niceTicks(lo,hi,n=5){if(lo===hi){lo-=1;hi+=1;}const span=hi-lo,step0=span/n,mag=Math.pow(10,Math.floor(Math.log10(step0)));
+  let step=mag;for(const k of[1,2,2.5,5,10])if(step0<=k*mag){step=k*mag;break;}
+  const t=[];for(let v=Math.ceil(lo/step)*step;v<=hi+1e-9;v+=step)t.push(+v.toFixed(10));return t;}
+function chart(cv,opts){const{g,w,h}=prep(cv);const mL=56,mR=14,mT=10,mB=30;const iw=w-mL-mR,ih=h-mT-mB;
+  let xs=[],yl=[];opts.series.forEach(s=>{s.x.forEach((v,i)=>{if(s.y[i]!=null&&!isNaN(s.y[i])){xs.push(v);yl.push(s.y[i]);}});});
+  if(opts.zeroLine)yl.push(0);if(opts.hlines)opts.hlines.forEach(hl=>yl.push(hl.y));
+  let x0=Math.min(...xs),x1=Math.max(...xs);if(opts.xlim){[x0,x1]=opts.xlim;}
+  let a=Math.min(...yl),b=Math.max(...yl);const pd=(b-a||1)*(opts.padY??0.07);let y0=a-pd,y1=b+pd;
+  if(opts.ylim){[y0,y1]=opts.ylim;}
+  const X=v=>mL+(v-x0)/(x1-x0||1)*iw, Yc=v=>mT+ih-(v-y0)/(y1-y0)*ih;
+  g.font='11.5px '+FONT;g.textAlign='right';g.textBaseline='middle';
+  niceTicks(y0,y1,5).forEach(t=>{if(t<y0||t>y1)return;
+    g.strokeStyle='#efede8';g.beginPath();g.moveTo(mL,Yc(t));g.lineTo(w-mR,Yc(t));g.stroke();
+    g.fillStyle='#666';g.fillText(fmt(t,Math.abs(y1-y0)<2?2:(Math.abs(y1-y0)<20?1:0)),mL-6,Yc(t));});
+  g.textAlign='center';g.textBaseline='top';g.fillStyle='#666';
+  (opts.xticks||niceTicks(x0,x1,7)).forEach(t=>{if(t<x0-1e-9||t>x1+1e-9)return;
+    g.fillText(opts.xFmt?opts.xFmt(t):fmt(t,0),X(t),mT+ih+7);});
+  g.strokeStyle='#bbb';g.strokeRect(mL,mT,iw,ih);
+  if(opts.zeroLine&&y0<0&&y1>0){g.strokeStyle='#999';g.setLineDash([4,3]);g.beginPath();g.moveTo(mL,Yc(0));g.lineTo(w-mR,Yc(0));g.stroke();g.setLineDash([]);}
+  if(opts.hlines)opts.hlines.forEach(hl=>{g.strokeStyle=hl.color||'#aaa';g.setLineDash(hl.dash||[4,3]);
+    g.beginPath();g.moveTo(mL,Yc(hl.y));g.lineTo(w-mR,Yc(hl.y));g.stroke();g.setLineDash([]);});
+  if(opts.diag){g.strokeStyle='#999';g.setLineDash([5,4]);g.beginPath();
+    const lo=Math.max(x0,y0),hi=Math.min(x1,y1);g.moveTo(X(lo),Yc(lo));g.lineTo(X(hi),Yc(hi));g.stroke();g.setLineDash([]);}
+  opts.series.forEach(s=>{g.strokeStyle=s.color;g.fillStyle=s.color;g.lineWidth=s.width||1.6;
+    if(s.dash)g.setLineDash(s.dash);else g.setLineDash([]);
+    if(s.type==='bar'){const bw=Math.max(2.5,iw/(s.x.length*1.8));
+      s.x.forEach((xv,i)=>{const v=s.y[i];if(v==null)return;const yv=Yc(v),yz=Yc(Math.max(y0,Math.min(y1,0)));
+        g.globalAlpha=0.85;g.fillRect(X(xv)-bw/2,Math.min(yv,yz),bw,Math.abs(yv-yz)||1);g.globalAlpha=1;});}
+    else if(s.type==='dot'){s.x.forEach((xv,i)=>{const v=s.y[i];if(v==null)return;
+      g.beginPath();g.arc(X(xv),Yc(v),s.r||2.6,0,7);g.globalAlpha=0.6;g.fill();g.globalAlpha=1;});}
+    else{g.beginPath();let pen=false;
+      s.x.forEach((xv,i)=>{const v=s.y[i];if(v==null||isNaN(v)){pen=false;return;}
+        const px=X(xv),py=Yc(v);if(!pen){g.moveTo(px,py);pen=true;}else g.lineTo(px,py);});g.stroke();g.setLineDash([]);}});
+  g.setLineDash([]);}
+function setLegend(id,items){const el=document.getElementById(id);if(!el)return;
+  el.innerHTML=items.map(it=>`<span><i class="${it.dash?'dash':''}" style="border-color:${it.c}"></i>${it.t}</span>`).join('');}
+function dateTicks(n){ // returns xticks indices + formatter for D.dates
+  const nt=Math.min(7,Math.max(2,Math.floor(900/130)));const t=[];
+  for(let k=0;k<=nt;k++)t.push(Math.round((n-1)*k/nt));
+  return {xticks:t,xFmt:v=>D.dates?(D.dates[Math.round(v)]??''):String(Math.round(v))};}
+
+/* ============================================================ parsing */
+function parseText(txt){
+  const lines=txt.trim().split(/\r?\n/).filter(l=>l.trim().length);
+  if(lines.length<3)return {err:'데이터가 너무 적습니다 (3행 이상 필요).'};
+  const delim=lines[0].includes('\t')?'\t':(lines[0].includes(',')?',':/\s+/);
+  const head=lines[0].split(delim).map(s=>s.trim());
+  const rows=lines.slice(1).map(l=>l.split(delim).map(s=>s.trim()));
+  // detect date col: first col non-numeric & parseable as date
+  const first=rows.slice(0,8).map(r=>r[0]);
+  const isDate=first.every(v=>isNaN(parseFloat(v))||/[-/.]/.test(v))&&first.every(v=>!isNaN(Date.parse(v)));
+  const start=isDate?1:0;
+  const cols=head.slice(start);
+  if(!cols.length)return {err:'변수 열이 없습니다.'};
+  const vals={};cols.forEach(c=>vals[c]=[]);
+  const dates=isDate?[]:null;
+  rows.forEach(r=>{
+    if(isDate)dates.push(r[0]);
+    cols.forEach((c,j)=>{const v=parseFloat(r[start+j]);vals[c].push(isNaN(v)?null:v);});});
+  return {cols,vals,dates,n:rows.length,isTS:isDate};
+}
+function applyData(d){
+  D=d;
+  document.getElementById('headmeta').textContent=
+    `${D.n} obs × ${D.cols.length} vars`+(D.isTS?` · ${D.dates[0]} – ${D.dates[D.n-1]} (time series)`:' (cross-section/index)');
+  // preview table
+  const tb=document.getElementById('tbPreview');
+  let h='<caption><span class="cno">Preview.</span> 처음 6행 / 마지막 2행</caption><thead><tr>'+
+    (D.isTS?'<th>date</th>':'<th>#</th>')+D.cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+  const idx=[...Array(Math.min(6,D.n)).keys(),...(D.n>8?[D.n-2,D.n-1]:[])];
+  idx.forEach(i=>{h+=`<tr><td>${D.isTS?D.dates[i]:i+1}</td>`+D.cols.map(c=>`<td>${fmt(D.vals[c][i])}</td>`).join('')+'</tr>';});
+  tb.innerHTML=h+'</tbody>';
+  // populate selectors
+  ['distVar','tsVar','acfVar','olsY','coY','coX'].forEach(id=>{
+    document.getElementById(id).innerHTML=D.cols.map(c=>`<option>${c}</option>`).join('');});
+  const chips=document.getElementById('olsXChips');
+  chips.innerHTML=D.cols.map((c,i)=>`<span class="chip ${i===1?'on':''}" data-c="${c}">${c}</span>`).join('');
+  chips.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{ch.classList.toggle('on');});
+  if(D.cols.length>1)document.getElementById('olsY').value=D.cols[0];
+  if(D.cols.length>1)document.getElementById('coX').value=D.cols[1];
+  // VAR chips with ordered selection (data-ord shows pick order)
+  varOrder=[];
+  const vc=document.getElementById('varChips');
+  vc.innerHTML=D.cols.map(c=>`<span class="chip" data-c="${c}">${c}</span>`).join('');
+  vc.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
+    const c=ch.dataset.c; const i=varOrder.indexOf(c);
+    if(i>=0){ varOrder.splice(i,1); ch.classList.remove('on'); }
+    else { if(varOrder.length>=4)return; varOrder.push(c); ch.classList.add('on'); }
+    vc.querySelectorAll('.chip').forEach(x=>{ const o=varOrder.indexOf(x.dataset.c);
+      x.textContent = o>=0? `${o+1}. ${x.dataset.c}` : x.dataset.c; });
+  });
+  // default VAR pick: first 2-3 numeric vars
+  D.cols.slice(0,Math.min(3,D.cols.length)).forEach(c=>{
+    const ch=vc.querySelector(`.chip[data-c="${c}"]`); if(ch){varOrder.push(c);ch.classList.add('on');} });
+  vc.querySelectorAll('.chip').forEach(x=>{ const o=varOrder.indexOf(x.dataset.c);
+    x.textContent = o>=0? `${o+1}. ${x.dataset.c}` : x.dataset.c; });
+  redrawAll();
+}
+let varOrder=[];
+document.getElementById('btnParse').onclick=()=>{
+  const r=parseText(document.getElementById('dataIn').value);
+  const msg=document.getElementById('parseMsg');
+  if(r.err){msg.innerHTML=`<span class="err">${r.err}</span>`;return;}
+  msg.textContent=`✓ ${r.n}행 × ${r.cols.length}열 적용됨`;applyData(r);};
+document.getElementById('fileIn').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+  rd.onload=()=>{document.getElementById('dataIn').value=rd.result;document.getElementById('btnParse').click();};
+  rd.readAsText(f);};
+document.getElementById('btnSample').onclick=()=>{
+  // AR(1) x, y = 0.6x + noise, plus trending z
+  let x=0,y=0,z=100;const L=['date\tx\ty\tz'];const d0=new Date(2022,0,3);
+  for(let i=0;i<500;i++){x=0.97*x+randn()*0.5;y=0.6*x+0.85*y*0+randn()*0.4+0.3*y;z+=0.05+randn()*0.8;
+    const dt=new Date(d0);dt.setDate(d0.getDate()+Math.floor(i*7/5)+ (i%5>=5?2:0));
+    L.push(`${dt.toISOString().slice(0,10)}\t${(3+x).toFixed(4)}\t${(2.5+y).toFixed(4)}\t${z.toFixed(3)}`);}
+  document.getElementById('dataIn').value=L.join('\n');document.getElementById('btnParse').click();};
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+/* ============================================================ sections */
+function getSeries(name,useDiff){const a=D.vals[name];return useDiff?diff(a):a;}
+
+function drawDesc(){
+  if(!D.n)return;const useD=document.getElementById('descDiff').checked;
+  let h='<thead><tr><th>변수</th><th>n</th><th>평균</th><th>표준편차</th><th>최소</th><th>P25</th><th>중위</th><th>P75</th><th>최대</th><th>왜도</th><th>첨도(excess)</th><th>JB p값</th></tr></thead><tbody>';
+  D.cols.forEach((c,i)=>{
+    const a=clean(getSeries(c,useD));if(a.length<5)return;
+    const S=skew(a),K=kurt(a),n=a.length;
+    const jb=n/6*(S*S+K*K/4),jp=chi2Pval(jb,2);
+    h+=`<tr class="${i===D.cols.length-1?'last':''}"><td>${useD?'Δ':''}${c}</td><td>${n}</td><td>${fmt(mean(a))}</td><td>${fmt(sd(a))}</td><td>${fmt(Math.min(...a))}</td><td>${fmt(quant(a,.25))}</td><td>${fmt(quant(a,.5))}</td><td>${fmt(quant(a,.75))}</td><td>${fmt(Math.max(...a))}</td><td>${fmt(S,2)}</td><td>${fmt(K,2)}</td><td class="${jp<0.05?'pos':''}">${fmt(jp,3)}</td></tr>`;});
+  document.getElementById('tbDesc').innerHTML=
+    '<caption><span class="cno">Table 1.</span> 변수별 기술통계'+(useD?' (1차 차분)':'')+'</caption>'+h+'</tbody>';
+}
+
+function drawDist(){
+  if(!D.n)return;const v=document.getElementById('distVar').value;
+  const useD=document.getElementById('distDiff').checked;
+  const bins=+document.getElementById('distBins').value;
+  const a=clean(getSeries(v,useD));if(a.length<10)return;
+  const lo=Math.min(...a),hi=Math.max(...a),bw=(hi-lo)/bins||1;
+  const cnt=new Array(bins).fill(0);a.forEach(x=>{cnt[Math.min(bins-1,Math.floor((x-lo)/bw))]++;});
+  const dens=cnt.map(c=>c/(a.length*bw));
+  const xc=cnt.map((_,i)=>lo+(i+0.5)*bw);
+  const m=mean(a),s=sd(a);
+  const gx=[],gy=[];for(let i=0;i<=120;i++){const x=lo+(hi-lo)*i/120;gx.push(x);
+    gy.push(Math.exp(-(((x-m)/s)**2)/2)/(s*Math.sqrt(2*Math.PI)));}
+  chart(document.getElementById('figHist'),{padY:0.05,series:[
+    {x:xc,y:dens,color:C.navy,type:'bar'},
+    {x:gx,y:gy,color:C.burg,width:2}]});
+  setLegend('lgD1',[{c:C.navy,t:'표본 밀도'},{c:C.burg,t:`N(${fmt(m,2)}, ${fmt(s,2)}²)`}]);
+  // QQ
+  const sorted=a.slice().sort((x,y)=>x-y);
+  const tq=sorted.map((_,i)=>m+s*qnorm((i+0.5)/a.length));
+  chart(document.getElementById('figQQ'),{diag:true,padY:0.05,series:[
+    {x:tq,y:sorted,color:C.navy,type:'dot',r:2.4}],
+    xFmt:vv=>fmt(vv,1)});
+}
+
+function drawTS(){
+  if(!D.n)return;const v=document.getElementById('tsVar').value;
+  const w=+document.getElementById('tsWin').value;
+  const mode=document.querySelector('#tsModeBtns .on').dataset.m;
+  const a=D.vals[v];const xi=a.map((_,i)=>i);const dt=dateTicks(D.n);
+  if(mode==='level'){
+    chart(document.getElementById('figTS'),{...dt,series:[
+      {x:xi,y:a,color:C.navy,width:1.4},
+      {x:xi,y:movavg(a,w),color:C.burg,width:2}]});
+    setLegend('lgTS',[{c:C.navy,t:v},{c:C.burg,t:`${w}-obs 이동평균`}]);
+    document.getElementById('tsCap').textContent='시계열과 롤링 평균';
+  }else if(mode==='vol'){
+    const dv=diff(a);
+    chart(document.getElementById('figTS'),{...dt,padY:0.08,series:[
+      {x:xi,y:rollsd(dv,w),color:C.burg,width:1.8}]});
+    setLegend('lgTS',[{c:C.burg,t:`롤링 σ(Δ${v}), w=${w}`}]);
+    document.getElementById('tsCap').textContent='변화분의 롤링 변동성';
+  }else{
+    const ma=movavg(a,w),sdv=rollsd(a,w);
+    const z=a.map((x,i)=>x==null||ma[i]==null||sdv[i]==null||sdv[i]<1e-12?null:(x-ma[i])/sdv[i]);
+    chart(document.getElementById('figTS'),{...dt,zeroLine:true,hlines:[{y:2},{y:-2}],series:[
+      {x:xi,y:z,color:C.olive,width:1.6}]});
+    setLegend('lgTS',[{c:C.olive,t:`롤링 Z-score(${v}), w=${w} · ±2 밴드`}]);
+    document.getElementById('tsCap').textContent='롤링 Z-score';
+  }
+}
+
+function pearson(a,b){let n=0,sa=0,sb=0,saa=0,sbb=0,sab=0;
+  for(let i=0;i<a.length;i++){const x=a[i],y=b[i];if(x==null||y==null||isNaN(x)||isNaN(y))continue;
+    n++;sa+=x;sb+=y;saa+=x*x;sbb+=y*y;sab+=x*y;}
+  if(n<5)return null;const cov=sab/n-sa*sb/n/n,va=saa/n-(sa/n)**2,vb=sbb/n-(sb/n)**2;
+  return cov/Math.sqrt(va*vb);}
+function drawCorr(){
+  if(!D.n)return;const mode=document.querySelector('#corrModeBtns .on').dataset.m;
+  const ser=D.cols.map(c=>mode==='diff'?diff(D.vals[c]):D.vals[c]);
+  let h='<thead><tr><th></th>'+D.cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+  D.cols.forEach((ci,i)=>{h+=`<tr><td><b>${ci}</b></td>`;
+    D.cols.forEach((cj,j)=>{
+      if(j>i){h+='<td></td>';return;}
+      if(j===i){h+='<td>1.00</td>';return;}
+      const r=pearson(ser[i],ser[j]);
+      const st=r==null?'':(Math.abs(r)>=0.7?'style="color:#8b1a1a;font-weight:bold"':(Math.abs(r)>=0.4?'style="background:#f6f1ef"':''));
+      h+=`<td ${st}>${r==null?'–':fmt(r,2)}</td>`;});h+='</tr>';});
+  document.getElementById('tbCorr').innerHTML=
+    `<caption><span class="cno">Table 2.</span> Pearson 상관행렬 — ${mode==='diff'?'1차 차분':'레벨'}</caption>`+h+'</tbody>';
+}
+
+function runOLS(){
+  if(!D.n)return;const yv=document.getElementById('olsY').value;
+  const xs=[...document.querySelectorAll('#olsXChips .chip.on')].map(c=>c.dataset.c).filter(c=>c!==yv);
+  if(!xs.length){document.getElementById('tbOLS').innerHTML='<caption class="err">설명변수를 1개 이상 선택하세요.</caption>';return;}
+  const useD=document.getElementById('olsDiff').checked, hac=document.getElementById('olsHAC').checked;
+  const y=useD?diff(D.vals[yv]):D.vals[yv];
+  const X=xs.map(c=>useD?diff(D.vals[c]):D.vals[c]);
+  const r=ols(y,X,hac);
+  if(!r){document.getElementById('tbOLS').innerHTML='<caption class="err">표본이 부족합니다.</caption>';return;}
+  const names=['(상수)',...xs.map(c=>(useD?'Δ':'')+c)];
+  let h='<thead><tr><th>변수</th><th>계수</th><th>SE'+(hac?' (NW)':'')+'</th><th>t</th><th>p값</th><th></th></tr></thead><tbody>';
+  names.forEach((nm,j)=>{
+    const stars=r.p[j]<0.01?'***':(r.p[j]<0.05?'**':(r.p[j]<0.1?'*':''));
+    h+=`<tr class="${j===names.length-1?'last':''}"><td>${nm}</td><td>${fmt(r.beta[j],4)}</td><td>${fmt(r.se[j],4)}</td><td>${fmt(r.t[j],2)}</td><td>${fmt(r.p[j],4)}</td><td class="sig3">${stars}</td></tr>`;});
+  document.getElementById('tbOLS').innerHTML=
+    `<caption><span class="cno">Table 3.</span> OLS: ${(useD?'Δ':'')+yv} ~ ${names.slice(1).join(' + ')}</caption>`+h+'</tbody>';
+  document.getElementById('olsCards').innerHTML=[
+    ['R²',fmt(r.r2,3),''],['Adj. R²',fmt(r.ar2,3),''],['n',r.n,'유효 표본'],
+    ['Durbin–Watson',fmt(r.dw,2),r.dw<1.4?'양(+)의 자기상관 의심':(r.dw>2.6?'음(−)의 자기상관 의심':'대체로 무자기상관')],
+    ['잔차 σ',fmt(r.sig,4),'']]
+    .map(([k,v,s])=>`<div class="card"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+  // figures
+  const yAct=r.rows.map(i=>y[i]);
+  chart(document.getElementById('figOLSFit'),{diag:true,padY:0.05,series:[
+    {x:r.fit,y:yAct,color:C.navy,type:'dot',r:2.6}],xFmt:v=>fmt(v,1)});
+  setLegend('lgO1',[{c:C.navy,t:'관측치 (x=적합값, y=실제값) · 점선=45°'}]);
+  const xi=r.rows;const dt=dateTicks(D.n);
+  chart(document.getElementById('figOLSResid'),{...dt,zeroLine:true,series:[
+    {x:xi,y:r.res,color:C.burg,width:1.3}]});
+}
+document.getElementById('btnOLS').onclick=runOLS;
+
+function drawACF(){
+  if(!D.n)return;const v=document.getElementById('acfVar').value;
+  const useD=document.getElementById('acfDiff').checked;
+  const L=+document.getElementById('acfLags').value;
+  const p=+document.getElementById('adfLags').value;
+  const a=getSeries(v,useD);const cl=clean(a);if(cl.length<L+10)return;
+  const r=acf(a,L);const band=1.96/Math.sqrt(cl.length);
+  const lags=r.map((_,i)=>i);
+  chart(document.getElementById('figACF'),{zeroLine:true,padY:0.06,
+    hlines:[{y:band,color:'#bbb'},{y:-band,color:'#bbb'}],
+    xticks:niceTicks(0,L,8),series:[{x:lags,y:r,color:C.navy,type:'bar'}]});
+  const pr=pacf(r,L);
+  chart(document.getElementById('figPACF'),{zeroLine:true,padY:0.06,
+    hlines:[{y:band,color:'#bbb'},{y:-band,color:'#bbb'}],
+    xticks:niceTicks(1,L,8),series:[{x:pr.map((_,i)=>i+1),y:pr,color:C.olive,type:'bar'}]});
+  // AR(1) summary + ADF
+  const phi=r[1];const hl=(phi>0&&phi<1)?Math.log(0.5)/Math.log(phi):null;
+  const ad=adf(a,p);
+  document.getElementById('acfCards').innerHTML=[
+    ['AR(1) ρ̂',fmt(phi,3),''],['반감기',hl?fmt(hl,1)+' obs':'–','ln(0.5)/ln(ρ̂)'],
+    ['ADF t-stat',ad?fmt(ad.t,2):'–',`시차 ${p}, 상수항 포함`],
+    ['표본',cl.length,'']]
+    .map(([k,v,s])=>`<div class="card"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+  if(ad){
+    const rej=ad.t<ad.crit[5];
+    document.getElementById('adfOut').innerHTML=
+      `<b>ADF 단위근 검정</b> — H₀: 단위근 존재. t = <b>${fmt(ad.t,2)}</b> vs 임계값 1% ${ad.crit[1]} / 5% ${ad.crit[5]} / 10% ${ad.crit[10]} (MacKinnon, 상수항 포함). `+
+      (rej?`<span style="color:#5a6b3b"><b>5% 수준에서 단위근 기각 → 정상(stationary) 시계열로 판단.</b></span>`
+          :`<span style="color:#8b1a1a"><b>단위근을 기각하지 못함 → 비정상 가능성. 차분 후 분석 권장.</b></span>`);
+  }
+  // all-variable ADF summary (level vs diff)
+  const p2=p;
+  let th='<thead><tr><th>변수</th><th>레벨 ADF t</th><th>레벨 판정</th><th>Δ ADF t</th><th>Δ 판정</th><th>차수</th></tr></thead><tbody>';
+  D.cols.forEach(c=>{
+    const al=adf(D.vals[c],p2), ad2=adf(diff(D.vals[c]),p2);
+    if(!al){th+=`<tr><td>${c}</td><td colspan="5" style="color:#999">표본 부족</td></tr>`;return;}
+    const rejL=al.t<al.crit[5], rejD=ad2&&ad2.t<ad2.crit[5];
+    const order = rejL? 'I(0) 정상' : (rejD? '<b>I(1)</b>' : 'I(2)+?');
+    th+=`<tr><td>${c}</td><td>${fmt(al.t,2)}</td><td class="${rejL?'':'neg'}">${rejL?'정상':'단위근'}</td><td>${ad2?fmt(ad2.t,2):'–'}</td><td class="${rejD?'pos':''}">${rejD?'정상':'단위근'}</td><td>${order}</td></tr>`;
+  });
+  document.getElementById('tbADFall').innerHTML=th+'</tbody>';
+}
+
+/* ================= 8. VAR ================= */
+let lastVAR=null;
+function runVAR(){
+  const host=document.getElementById('tbVAR');
+  if(varOrder.length<2){host.innerHTML='<caption class="err">변수를 2개 이상 선택하세요.</caption>';
+    document.getElementById('irfGrid').innerHTML='';document.getElementById('tbFEVD').innerHTML='';
+    document.getElementById('varCards').innerHTML='';return;}
+  const names=varOrder.slice();
+  const useD=document.getElementById('varDiff').checked;
+  const p=Math.max(1,Math.min(8,+document.getElementById('varP').value||2));
+  const H=Math.max(5,Math.min(60,+document.getElementById('varH').value||20));
+  const data=alignedMatrix(names,useD);
+  const m=estimateVAR(data,p);
+  if(!m){host.innerHTML='<caption class="err">표본이 부족합니다 (시차를 줄이거나 변수를 줄이세요).</caption>';return;}
+  lastVAR={m,names,H,useD};
+  const k=names.length;
+  // coef table
+  let th='<thead><tr><th>eq \\ 설명</th><th>const</th>';
+  for(let l=1;l<=p;l++)for(let j=0;j<k;j++)th+=`<th>${names[j]}(−${l})</th>`;
+  th+='</tr></thead><tbody>';
+  for(let eq=0;eq<k;eq++){ th+=`<tr><td><b>${(useD?'Δ':'')+names[eq]}</b></td>`;
+    m.B[eq].forEach(b=>th+=`<td>${fmt(b,3)}</td>`); th+='</tr>'; }
+  host.innerHTML=`<caption><span class="cno">Table 5.</span> VAR(${p}) 계수 ${useD?'(1차 차분)':''}</caption>`+th+'</tbody>';
+  document.getElementById('varCards').innerHTML=[
+    ['변수 수 k',k,''],['시차 p',p,''],['유효표본',m.n,''],
+    ['Cholesky 순서',names.join(' → '),'동시 외생성 가정']]
+    .map(([a,b,c])=>`<div class="card"><div class="k">${a}</div><div class="v" style="font-size:${String(b).length>10?'14px':'21px'}">${b}</div><div class="s">${c}</div></div>`).join('');
+  // IRF
+  const Theta=varIRF(m,H);
+  const grid=document.getElementById('irfGrid');grid.innerHTML='';
+  let fi=0;
+  for(let shock=0;shock<k;shock++)for(let resp=0;resp<k;resp++){
+    fi++;
+    const id=`irf_${shock}_${resp}`;
+    const div=document.createElement('div');div.className='figure';
+    div.innerHTML=`<div class="figcap"><b><span class="fno">IRF.</span></b> ${names[shock]} 충격 → ${names[resp]} 반응</div><canvas id="${id}" height="220"></canvas>`;
+    grid.appendChild(div);
+    const y=Theta.map(T=>T[resp][shock]);
+    // analytic-ish SE band (rough): scale by 1/sqrt(n) cumulative — simple Lütkepohl approx
+    const se=y.map((v,s)=> Math.sqrt(s+1)*Math.abs(Theta[Math.min(s,H)][resp][shock])*0 + Math.sqrt((m.Sigma[resp][resp])/m.n));
+    const up=y.map((v,i)=>v+2*se[i]), dn=y.map((v,i)=>v-2*se[i]);
+    const xs=y.map((_,i)=>i);
+    chart(document.getElementById(id),{zeroLine:true,padY:0.12,xticks:niceTicks(0,H,6),series:[
+      {x:xs,y:up,color:'#ccc',width:1,dash:[2,3]},
+      {x:xs,y:dn,color:'#ccc',width:1,dash:[2,3]},
+      {x:xs,y:y,color:(shock===resp?C.burg:C.navy),width:2}]});
+  }
+  drawFEVD();
+}
+function drawFEVD(){
+  if(!lastVAR)return;
+  const {m,names,H}=lastVAR;const k=names.length;
+  const h=Math.max(1,Math.min(H,+document.getElementById('fevdH').value||10));
+  const Theta=varIRF(m,H);
+  const F=varFEVD(Theta,h,k);
+  let th='<thead><tr><th>대상 \\ 충격</th>'+names.map(n=>`<th>${n}</th>`).join('')+'</tr></thead><tbody>';
+  for(let i=0;i<k;i++){ th+=`<tr><td><b>${names[i]}</b></td>`;
+    for(let j=0;j<k;j++){ const v=F[i][j]; th+=`<td class="${i===j?'sig3':''}">${fmt(v,1)}</td>`; } th+='</tr>'; }
+  document.getElementById('tbFEVD').innerHTML=`<caption><span class="cno">Table 6.</span> FEVD at h=${h} (%)</caption>`+th+'</tbody>';
+}
+document.getElementById('btnVAR').onclick=runVAR;
+document.getElementById('fevdH').addEventListener('input',drawFEVD);
+
+/* ================= 9. GRANGER ================= */
+function runGranger(){
+  if(!D.n||D.cols.length<2){document.getElementById('tbGranger').innerHTML='<caption class="err">변수 2개 이상 필요.</caption>';return;}
+  const p=Math.max(1,Math.min(8,+document.getElementById('grangerP').value||2));
+  const useD=document.getElementById('grangerDiff').checked;
+  const alpha=+document.getElementById('grangerAlpha').value;
+  const cols=D.cols;
+  let th='<thead><tr><th>원인 ↓ \\ 결과 →</th>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+  const findings=[];
+  cols.forEach(cause=>{ th+=`<tr><td><b>${cause}</b></td>`;
+    cols.forEach(effect=>{
+      if(cause===effect){th+='<td style="background:#f3f1ec">—</td>';return;}
+      const g=grangerTest(effect,cause,p,useD);
+      if(!g){th+='<td>–</td>';return;}
+      const sig=g.pval<alpha;
+      if(sig)findings.push(`${cause} → ${effect} (p=${fmt(g.pval,3)})`);
+      th+=`<td class="${sig?'sig3':''}" style="${sig?'color:#8b1a1a':''}">${fmt(g.F,2)}<br><span style="font-size:11px;color:#888">${fmt(g.pval,3)}</span></td>`;
+    }); th+='</tr>'; });
+  document.getElementById('tbGranger').innerHTML=
+    `<caption><span class="cno">Table 7.</span> Granger 인과 ${useD?'(차분)':''} — 시차 ${p}, 셀=F / p값</caption>`+th+'</tbody>';
+  document.getElementById('grangerOut').innerHTML= findings.length?
+    `<b>유의한 예측적 선행관계 (${(alpha*100)}% 수준):</b> ${findings.join(' · ')}. 단, 이는 예측력일 뿐 구조적 인과가 아니며 누락변수·동시성에 취약하다.`
+    : `${(alpha*100)}% 수준에서 유의한 Granger 인과 없음. 시차 p나 차분 여부를 바꿔 재확인해 보라.`;
+}
+document.getElementById('btnVAR') && document.querySelectorAll('#sec-granger .btn').forEach(()=>{});
+['grangerP','grangerDiff','grangerAlpha'].forEach(id=>document.getElementById(id).addEventListener('change',runGranger));
+
+/* ================= 10. COINTEGRATION ================= */
+function runCoint(){
+  const yv=document.getElementById('coY').value, xv=document.getElementById('coX').value;
+  const out=document.getElementById('coOut');
+  if(yv===xv){out.innerHTML='<span class="err">서로 다른 두 변수를 선택하세요.</span>';return;}
+  const p=Math.max(0,Math.min(20,+document.getElementById('coLags').value||3));
+  // align level pairs
+  const yy=[],xx=[],idx=[];
+  for(let i=0;i<D.n;i++){const a=D.vals[yv][i],b=D.vals[xv][i];
+    if(a==null||isNaN(a)||b==null||isNaN(b))continue; yy.push(a);xx.push(b);idx.push(i);}
+  if(yy.length<30){out.innerHTML='<span class="err">표본 부족.</span>';return;}
+  // step 1: OLS y = a + b x
+  const r=ols(yy,[xx],false); if(!r){out.innerHTML='<span class="err">회귀 실패.</span>';return;}
+  const a0=r.beta[0],b1=r.beta[1];
+  const resid=yy.map((v,i)=>v-a0-b1*xx[i]);
+  // step 2: ADF on residual (no const, but our adf includes const; use it, compare EG crit)
+  const ad=adf(resid,p);
+  const egCrit={1:-3.90,5:-3.34,10:-3.04}; // Engle-Granger, 2 vars, constant
+  const rej=ad && ad.t<egCrit[5];
+  document.getElementById('coCards').innerHTML=[
+    ['β (헤지비율)',fmt(b1,4),`${yv} ~ ${xv}`],['α (절편)',fmt(a0,4),''],
+    ['잔차 ADF t',ad?fmt(ad.t,2):'–',`시차 ${p}`],
+    ['반감기',ad&&ad.hl?fmt(ad.hl,1)+' obs':'–','잔차 평균회귀']]
+    .map(([k,v,s])=>`<div class="card"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+  const xs=idx.slice();const dt=dateTicks(D.n);
+  chart(document.getElementById('figCoint'),{...dt,zeroLine:true,padY:0.1,
+    series:[{x:xs,y:resid,color:C.burg,width:1.4}]});
+  out.innerHTML=`<b>Engle–Granger 공적분 검정</b> — 1단계 회귀 ${yv} = ${fmt(a0,3)} + ${fmt(b1,3)}·${xv}. 2단계 잔차 ADF t = <b>${ad?fmt(ad.t,2):'–'}</b> vs EG 임계값 1% ${egCrit[1]} / 5% ${egCrit[5]} / 10% ${egCrit[10]}. `+
+    (rej? `<span style="color:#5a6b3b"><b>5%에서 단위근 기각 → 두 변수는 공적분. 레벨 관계가 안정적이며 β=${fmt(b1,3)}가 장기 헤지비율. 단기 이탈은 ECM으로 회귀.</b></span>`
+        : `<span style="color:#8b1a1a"><b>공적분 증거 부족 → 레벨 회귀는 가성적일 수 있음. 차분 기반 분석 권장.</b></span>`)+
+    ` <i>주의: 두 변수가 각각 I(1)일 때만 의미가 있으니 §4에서 먼저 확인.</i>`;
+}
+document.getElementById('btnCoint').onclick=runCoint;
+
+/* ================= wiring ================= */
+function redrawAll(){drawDesc();drawDist();drawTS();drawCorr();runOLS();drawACF();runVAR();runGranger();runCoint();}
+[['descDiff','change',drawDesc],['distVar','change',drawDist],['distDiff','change',drawDist],['distBins','input',drawDist],
+ ['tsVar','change',drawTS],['tsWin','input',drawTS],
+ ['acfVar','change',drawACF],['acfDiff','change',drawACF],['acfLags','input',drawACF],['adfLags','input',drawACF]]
+ .forEach(([id,ev,fn])=>document.getElementById(id).addEventListener(ev,fn));
+document.querySelectorAll('#tsModeBtns .btn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#tsModeBtns .btn').forEach(x=>x.classList.remove('on'));b.classList.add('on');drawTS();});
+document.querySelectorAll('#corrModeBtns .btn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#corrModeBtns .btn').forEach(x=>x.classList.remove('on'));b.classList.add('on');drawCorr();});
+window.addEventListener('resize',()=>{if(D.n)redrawAll();});
+
+/* sidebar scrollspy */
+const secs=[...document.querySelectorAll('section')];
+const links=[...document.querySelectorAll('#side a')];
+window.addEventListener('scroll',()=>{
+  let cur=secs[0].id;
+  secs.forEach(s=>{if(s.getBoundingClientRect().top<140)cur=s.id;});
+  links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+cur));});
+</script>
+</body>
+</html>
