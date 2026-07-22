@@ -250,7 +250,7 @@ ol.refs li{margin-bottom:7px;}
     <div class="figure"><div class="figcap"><b><span class="fno">Figure 5b.</span></b> PCA 요인적재 (최근 1년)</div><div class="legend" id="lgF5b"></div><canvas id="figPca1y" height="320"></canvas><div class="fignote" id="evr1y"></div></div>
   </div>
   <h3>PCA 읽는 법 — 실무 해석</h3>
-  <p class="body"><b>적재(loading)는 "그 요인이 1단위 움직일 때 만기별로 몇 bp씩 움직이는가"의 형태</b>다. PC1은 전 만기에서 같은 부호·비슷한 크기 → 평행이동. 단, 적재가 완전히 평평하지 않고 중기물에서 살짝 솟아 있으면(통상적), "평행 +10bp" 충격도 실제로는 벨리가 더 움직인다는 뜻 — 듀레이션 헤지를 PC1 적재 가중으로 하면 단순 듀레이션 매칭보다 잔여 위험이 작다. PC2는 단기 음(−)·장기 양(+)의 단조 형태 → 스티프너/플래트너의 위험 축. PC3는 양 끝 음(−)·중간 양(+) → 버터플라이 축. <b>EVR(설명비중)의 변화가 레짐 신호</b>다: PC1 비중이 평소(~86%)보다 오르면 시장이 "방향성 장세"(통화정책 충격 주도), PC2·PC3 비중이 오르면 커브 트레이드가 작동하는 "상대가치 장세"다. 전체 표본과 최근 1년 패널을 나란히 둔 이유가 이것 — 두 적재 모양이 다르면 과거 베타로 짠 헤지비율이 현재 안 맞는다는 경고다.</p>
+  <p class="body">PC1=평행(방향성), PC2=기울기(스티프너 축), PC3=버터플라이 축. EVR 비중 변화가 레짐 신호 — PC1 비중 상승은 방향성 장세, PC2·3 상승은 상대가치 장세. 전체 표본과 최근 1년의 적재가 다르면 과거 베타 기반 헤지비율이 현재 안 맞는다는 경고다.</p>
   <p class="body">실무 적용 순서: (i) 포지션의 만기별 KRD를 세 적재에 사영해 PC1/PC2/PC3 익스포저로 환산, (ii) PC1 익스포저는 의도한 듀레이션 베팅인지 확인, (iii) 커브·플라이 트레이드는 PC1 익스포저가 0에 가깝게 가중을 짜야 "곡선 모양" 베팅이 되고 그렇지 않으면 사실상 레벨 베팅이다. 아래 Figure 6의 z-score는 그 모양 베팅의 진입·청산 타이밍 지표.</p>
   <p class="srcnote"><b>Sources:</b> Litterman &amp; Scheinkman (1991), <i>Journal of Fixed Income</i> — PC 헤지·위험배분의 원전; Lord &amp; Pelsser (2007), "Level–Slope–Curvature: Fact or Artefact?" <i>Applied Mathematical Finance</i> — 적재 형태의 견고성 논의.</p>
   <div class="ctrl">
@@ -338,7 +338,7 @@ ol.refs li{margin-bottom:7px;}
     <caption><span class="cno">Table 5.</span> 테너별 스왑스프레드 — 현재 수준과 분포·Z</caption>
   </table></div>
   <h3>수급 신호로 읽기 — Swap Spread Term Structure</h3>
-  <p class="body">IRS는 국채 현물 수급(발행·바이백·연기금 매수)과 분리된 "순수 금리 기대 + 딜러 헤지" 가격이므로, <b>스왑스프레드의 변화는 곧 국채 고유의 수급 충격을 분리해서 보여주는 필터</b>다. 읽는 법: (i) 특정 테너의 스프레드가 단독으로 하락(국채 금리만 상승) → 그 만기 국채의 공급 부담·매도 수급 — 예컨대 적자국채 증발 발표 후 10Y 스프레드만 빠지는 패턴. (ii) 스프레드가 단독 상승(국채만 강세) → 보험사 ALM·연기금 등 현물 실수요 유입. (iii) 곡선 전체의 평행 하락 → 발행 총량 우려 또는 딜러 대차대조표 제약. (iv) 단기 테너 스프레드 급등은 자금시장(레포·CD) 경색 신호로 별도 해석. 아래 Figure 8c는 이 분해를 위한 스프레드 기간구조 — <b>현재 곡선이 1M/3M 전 대비 어느 만기에서 벌어졌는지가 수급 충격의 위치</b>를 가리킨다.</p>
+  <p class="body">스왑스프레드는 국채 고유 수급 충격의 필터다: 특정 테너 단독 하락=그 만기 공급 부담, 단독 상승=실수요 유입, 곡선 전체 평행 하락=발행 총량·딜러 제약, 단기 테너 급등=자금시장 경색. Figure 8c에서 1M/3M 전 대비 벌어진 위치가 충격의 위치다.</p>
   <p class="srcnote"><b>Sources:</b> Krishnamurthy &amp; Vissing-Jørgensen (2012), "The Aggregate Demand for Treasury Debt," <i>Journal of Political Economy</i> — 국채 공급↑ → 국채 고유 프리미엄 축소(스프레드 하락); Jermann (2020), <i>RFS</i>; Klingler &amp; Sundaresan (2019), "An Explanation of Negative Swap Spreads," <i>Journal of Finance</i> — 연금 수요와 장기 스프레드.</p>
   <div class="ctrl">
     <label>Z-score 윈도우(영업일):</label>
@@ -357,7 +357,7 @@ ol.refs li{margin-bottom:7px;}
 <section id="sec-rv">
   <h2><span class="no">7.</span>개별 종목 Rich/Cheap — NSS 잔차 기반 상대가치 <span style="font-size:14px;font-weight:normal;color:#8a7c63;">(+ 유동성 프리미엄 조정)</span></h2>
   <div class="lede">개별 국고채(물가채 제외, <b>잔존 ≤30Y</b>)를 해당일 NSS 할인곡선으로 가격화한 적합 YTM과 민평 YTM의 차이(spread, bp)를 추적. 양(+) = cheap, 음(−) = rich. Z-score는 종목별 자체 분포 기준. <b>여기에 유동성 프리미엄 조정 컬럼(vs-지표·정상프리미엄·순저평)을 병기</b>해, 경과물/지표물 프리미엄을 걷어낸 종목 고유 저평/고평까지 함께 본다.</div>
-  <p class="body">개별 종목의 곡선 대비 잔차는 경과물/지표물 프리미엄, 발행 사이클, 수급을 반영하며 단기 평균회귀 성향을 보인다 — 적합곡선 잔차의 평균회귀가 유동성 프리미엄의 시계열 정보를 담는다는 점은 미 국채 시장에서 정량적으로 확인된 사실이다. 단, z-score가 높아도 구조적 사유(지표물 교체, barbell 수요)로 회귀하지 않을 수 있어 잔차의 '이유'를 함께 점검해야 한다. <b>[유동성 조정]</b> 국고 2/3/5/10/20/30년은 최소 6개월마다 지표물이 교체되므로, 3년 이력에서 각 시점의 지표물을 데이터로 식별하고 <b>vs-지표</b>(동시점 동일테너 지표물 대비 스프레드)를 계산하면 커브·클래스 공통요인이 상쇄된다. 경과연수별 <b>정상 유동성 프리미엄</b>을 빼면 <b>순저평(resid)</b> — 클래스 공통 이동이 아닌 종목 고유 신호가 남는다.</p>
+  <p class="body">적합곡선 잔차의 단기 평균회귀를 이용한 종목 상대가치. z가 높아도 구조적 사유(지표 교체·수요)로 회귀하지 않을 수 있어 잔차의 이유를 함께 점검한다. 유동성조정 컬럼은 동시점 동테너 지표물 대비 스프레드에서 경과연수별 정상 프리미엄을 뺀 순저평 — 클래스 공통요인이 상쇄된 종목 고유 신호다.</p>
   <p class="srcnote"><b>Sources:</b> Krishnamurthy (2002), "The Bond/Old-Bond Spread," <i>JFE</i>; Gürkaynak, Sack &amp; Wright (2007), <i>JME</i>; Hu, Pan &amp; Wang (2013), "Noise as Information for Illiquidity," <i>JF</i>; Fontaine &amp; Garcia (2012), <i>RFS</i>.</p>
   <div class="cards" id="rvCards"></div>
   <div class="figure">
@@ -466,19 +466,13 @@ ol.refs li{margin-bottom:7px;}
     <div class="legend" id="lgAcm"></div>
     <canvas id="figAcm" height="320"></canvas>
   </div>
-  <p class="note">해석 규약: TP 상승 국면(공급·불확실성 프라이싱)엔 같은 레벨이라도 장기물 상대매력↑,
-  기대성분 상승 국면엔 커브 전략보다 듀레이션 방향이 우선. 분해는 표본 내 VAR(1) 기대에 의존하므로
-  구조 변화 직후에는 기대성분이 느리게 적응한다(한계). 소표본(월말 ~120관측) 안정화를 위해 위험가격의 상태의존을 레벨 요인에 한정(level-only Λ₁ — 1요인 위험가격 제약, 무제약 추정은 Q-동학 발산 확인). 그 외는 미 ACM(NY Fed)과 동일 방법론.
-  <b>모형외 잔차</b>: 관측 = 기대 + TP + 잔차. level-only 제약의 대가로 장기물 적합이 체계적으로 낮아
-  잔차가 0이 아니며(Λ₁ 2요인 완화 실험: RMSE 68bp·잔차 확대로 기각), TP는 모형이 가격화한 부분만 담는다.
-  Korea Macro IX.4의 DKW-프록시 TP는 <b>관측 − 기대(잔차 포함) 정의</b>라 수준이 더 높게 나온다 —
-  두 수치의 차이 ≈ 본 잔차 + 기대경로 차이(AR(1) vs 커브 VAR(1))로 항등 분해된다.</p>
+  <p class="note">TP 상승 국면(공급·불확실성)엔 장기물 상대매력↑, 기대성분 상승 국면엔 듀레이션 방향이 우선. TP는 모형이 가격화한 부분만 담고 모형외 잔차는 별도 공개 — Korea IX.4의 잔차정의 TP와는 '잔차+기대경로 차이'만큼 수준이 다르다(방향 일치로 교차 확인).</p>
 </section>
 
 <section id="sec-method" style="border-bottom:none;">
   <h2><span class="no">11.</span>방법론 · 데이터 · 참고문헌</h2>
   <h3>모형</h3>
-  <p class="body">현물금리 함수는 Svensson(1994) 사양을 따른다: y(m) = β₀ + β₁·[1−e^(−m/τ₁)]/(m/τ₁) + β₂·{[1−e^(−m/τ₁)]/(m/τ₁) − e^(−m/τ₁)} + β₃·{[1−e^(−m/τ₂)]/(m/τ₂) − e^(−m/τ₂)}. τ를 고정하면 β는 선형이므로, (τ₁, τ₂) 격자 위에서 일괄 OLS로 β를 풀고 SSE 최소 격자점을 초기값으로 Nelder–Mead 국소 탐색을 수행했다. 이는 Gürkaynak–Sack–Wright(2007)가 지적한 다중 국소해 문제를 완화하는 표준적 절차다.</p>
+  <p class="body">Svensson(1994) 사양을 τ 격자 일괄 OLS + Nelder–Mead로 적합(GSW 2007의 다중 국소해 완화 절차).</p>
   <p class="srcnote"><b>Estimation:</b> 일별 15개 만기(0.25–30Y), 2016.6.7–현재 전 영업일 독립 적합. 평균 RMSE는 약 2bp. 안정화 제약: |β| ≤ 30, τ₁ ∈ [0.1, 5], τ₂ ∈ [0.8, 25], τ₂ ≥ 1.5τ₁ — τ₁ ≈ τ₂ 시 적재함수 공선성으로 β₁·β₂가 상쇄 발산하는 비식별 문제를 차단 (cf. Gürkaynak–Sack–Wright 2007의 추정 안정성 논의). 벨리 모드(§2)는 1–10Y 9개 만기에 Nelson–Siegel 원형(β₀, β₁, β₂, τ₁)을 별도 적합 — 9개 점에 6-parameter NSS는 과모수화되므로 험프 1개 사양이 적정.</p>
   <h3>개별 종목 가격화</h3>
   <p class="body">각 종목의 반기 현금흐름을 만기일에서 역산하고, 해당일 NSS 현물곡선으로 할인한 이론가에서 반기복리 YTM을 역산해 적합 YTM을 구했다. 스프레드 = 민평 YTM − 적합 YTM. 물가연동국고채는 실질금리 기준이므로 명목곡선 RV에서 제외했다. 동일 관행을 시계열 전체에 일관 적용했으므로 복리관행에 따른 수준 편의는 z-score에 영향을 주지 않는다.</p>
