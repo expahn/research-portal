@@ -576,7 +576,7 @@ table.jt .neg{color:var(--red)}
 
 <h3>IX.4 기간프리미엄 — ACM 무차익 모형(주) · AR(1) 잔차분해(보조)</h3>
 <p class="body"><b>주 모형: ACM</b>(Adrian-Crump-Moench 2013, 무차익 ATSM). 명목 커브만으로 식별되며 위험가격을 추정해 <b>기대 단기금리 경로와 가격화된 프리미엄을 모형 내부에서 분리</b>한다 — 10Y = 기대경로 + 기간프리미엄 + 모형외 잔차.
-<br><b>보조: AR(1) 잔차분해.</b> 기준금리 AR(1) 경로와 CPI 지속성 변환으로 만든 기대경로를 기준 삼아 TP를 잔차로 정의한다. 기대경로 가정이 ACM과 달라 <b>교차확인용</b>이며, 잔차 정의라 모형오차가 TP에 합산된다. TIPS·서베이를 쓰지 않으므로 D'Amico-Kim-Wei(2018)의 DKW가 아니다.</p>
+<br><b>보조: AR(1) 잔차분해.</b> 기준금리 AR(1) 경로와 CPI 지속성 변환으로 만든 기대경로를 기준 삼아 TP를 잔차로 정의한다. 기대경로 가정이 ACM과 달라 <b>교차확인용</b>이며, 잔차 정의라 모형오차가 TP에 합산된다. 물가연동국채·서베이를 쓰지 않으므로 D'Amico-Kim-Wei(2018)의 DKW가 아니다.</p>
 <p class="tnote" id="valAcmPrimary"></p>
 <div class="fig">
   <div class="chartbox tall"><canvas id="chDKW"></canvas></div>
@@ -590,7 +590,9 @@ table.jt .neg{color:var(--red)}
 <p class="tnote" id="valTpCmpNote"></p>
 
 <h4 style="margin:18px 0 6px">IX.4b 서베이 결합 3분해 — ACM × 소비자 기대인플레</h4>
-<p class="body">명목 10Y를 <b>기대 실질단기금리 · 기대 인플레이션 · 기간프리미엄</b>으로 나눈다. 기대경로와 TP는 ACM(명목 커브, 무차익)이 주고, 그 기대경로 안에서 <b>인플레 몫은 ECOS 소비자동향조사 관측치</b>가 준다 — 1·3·5년 지평 기대인플레를 순간기대 <span style="font-family:Consolas,monospace;font-size:12px">f(s)=π*+(f₀−π*)e<sup>−κs</sup></span>로 적합해 10년 평균으로 외삽한다(외삽 폭은 관측 지평 밖 ±0.5%p로 제한). Kim-Orphanides(2012)의 '명목커브 + 서베이' <b>식별 정신을 2단계로 근사</b>한 것이며, 서베이를 상태공간 관측식에 넣는 결합 추정은 아니다.</p>
+<p class="body">명목 10Y를 <b>기대 실질단기금리 · 기대 인플레이션 · 기간프리미엄</b>으로 나눈다. 순서가 중요하다 — <b>서베이는 ACM 추정에 들어가지 않는다</b>. ACM은 명목 커브만으로 <span style="font-family:Consolas,monospace;font-size:12px">10Y = 기대 명목단기금리 경로 + 명목 TP</span> 2분할을 먼저 끝내고(인플레 자료 불필요), 그다음 <b>서베이가 그 '기대경로' 한 조각만 실질과 인플레로 갈라준다</b>. TP는 ACM 값 그대로다.
+<br>기대인플레는 ECOS 소비자동향조사 1·3·5년 지평을 순간기대 <span style="font-family:Consolas,monospace;font-size:12px">f(s)=π*+(f₀−π*)e<sup>−κs</sup></span>로 적합해 10년 평균으로 외삽한다(외삽 폭은 관측 지평 밖 ±0.5%p 제한, 관측 2개 구간은 κ 고정).
+<br><b>이것은 DKW가 아니다.</b> 여기서 나오는 TP는 <b>명목</b> TP이고, 명목 TP = 실질 TP + <b>인플레 위험프리미엄</b>이다. 그 둘을 갈라내는 것이 DKW의 핵심인데 물가연동국채(KTBi) 커브 없이는 식별되지 않는다. 즉 인플레 위험프리미엄은 아래 '기간프리미엄' 막대 <b>안에 그대로 들어 있다</b>.</p>
 <div class="fig" id="figSurvWrap">
   <div class="chartbox tall"><canvas id="chSurv"></canvas></div>
   <div class="figcap"><b>Figure 23c.</b> 국고 10Y 서베이 결합 분해(누적): 기대 실질단기금리(청록) + 서베이 기대 인플레(금색) + ACM 기간프리미엄(적색) + 모형외 잔차(회색), 합 = 명목 10Y(흑선).</div>
@@ -603,10 +605,10 @@ table.jt .neg{color:var(--red)}
 <p class="tnote" id="valInfExpNote"></p>
 <p class="note"><b>한계 두 가지.</b> ① <b>가계 서베이는 전문가 전망보다 체계적으로 높다</b>(식료품·유가 등 체감 품목 가중이 커서) — 수준을 그대로 '시장 기대'로 읽지 말고 <b>변화</b>로 볼 것. ② 최장 관측이 5년이라 10년은 외삽이다. 이 두 가지 때문에 위 실질금리 조각은 <b>수준의 절대치보다 방향</b>이 의미 있다.</p>
 
-<p class="note"><b>진짜 DKW를 하려면 무엇이 더 필요한가.</b> (i) 물가연동국채(KTBi) 커브 — 한국은 발행·유동성이 얕아 유동성 프리미엄 식별이 어렵고, (ii) <b>다지평 서베이 기대인플레</b> — 현재 ECOS 소비자동향조사(향후 1년)만 수집 중이라 10Y 분해에 필요한 5~10년 기대가 없다. 둘 중 (ii)만 갖추면 TIPS 없이도 Kim-Orphanides(2012)식 '명목커브 + 서베이' 식별이 가능하므로, 그것이 현실적인 다음 단계다. 그때까지 이 절의 기대인플레 조각은 <b>CPI 실적치의 기계적 변환</b>(전방정보 없음: corr(Δ기대인플레, Δ국고10Y) = +0.08)임을 명시한다.
+<p class="note"><b>세 가지 자료가 각각 무엇을 사준다.</b> ① <b>인플레 서베이</b>(확보) — 기대경로를 실질과 인플레로 가른다. 위 IX.4b가 이것이며, 위험프리미엄 분리는 <b>못 한다</b>. ② <b>금리 서베이</b>(정책금리·국고 전망, 미확보) — Kim-Orphanides(2012)가 쓰는 자료로, 무차익 모형의 <b>기대경로 자체를 더 정확히 식별</b>해 준다(소표본에서 지속성 추정이 흔들리는 문제를 직접 겨냥). 우리 ACM 표본이 121개월뿐이라 실익이 크다. ③ <b>물가연동국채(KTBi) 커브</b>(미확보) — 명목 TP를 실질 TP와 <b>인플레 위험프리미엄</b>으로 가른다. <b>진짜 DKW는 ③이 있어야 하며 ①로 대체되지 않는다.</b> 한국은 KTBi 발행·유동성이 얕아 유동성 프리미엄 식별이 어렵다는 게 실질적 제약이다.
 <br>참고: Fed는 미국 DKW 추정치(5·10년 명목·실질·인플레 분해)를 매월 CSV로 공개한다(<span style="font-family:Consolas,monospace;font-size:12px">federalreserve.gov/econres/notes/feds-notes/DKW_updates.csv</span>) — 우리 구현이 아니라 <b>미국 비교 기준</b>으로만 쓴다. Kim-Walsh-Wei(2019)는 장기 인플레 기대가 모형별로 2.0~2.4%(CPI), r^LR은 0.5~2.0%로 추정치 폭이 큼을 보고하며 해석에 신중을 요한다.</p>
 
-<div class="src"><b>Sources.</b> Adrian-Crump-Moench (2013, JFE) — 주 모형; Kim-Orphanides (2012, JFQA) — 서베이 결합 식별(다음 단계); D'Amico-Kim-Wei (2018, JFQA) 및 Fed DKW 월간 CSV — 미국 비교 기준(본 절 구현 아님); Kim-Walsh-Wei (2019, FEDS Notes).</div>
+<div class="src"><b>Sources.</b> Adrian-Crump-Moench (2013, JFE) — 주 모형; Kim-Orphanides (2012, JFQA) — <b>금리</b> 서베이를 관측식으로 넣어 기대경로를 식별(향후 과제, 인플레 서베이가 아님); D'Amico-Kim-Wei (2018, JFQA) 및 Fed DKW 월간 CSV — 명목+TIPS+인플레서베이 결합, 미국 비교 기준(본 절 구현 아님); Kim-Walsh-Wei (2019, FEDS Notes).</div>
 </section>
 
 <!-- ============ X. 국민소득 — GDI·GNI ============ -->
