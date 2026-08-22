@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<title>graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --surface: #f6f7f9; --surface-2: #ffffff;
+  --ink: #1a2028; --ink-3: #8a919c;
+  --line: #d8dce2; --line-2: #c2c8d0;
+  --shadow: 0 8px 28px rgba(20,26,34,.12);
+  --bad: #c23a2b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #131820; --surface-2: #1a212b;
+    --ink: #e8ebef; --ink-3: #6e7784;
+    --line: #2b3441; --line-2: #39434f;
+    --shadow: 0 8px 28px rgba(0,0,0,.5);
+    --bad: #e9705e;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--surface); color: var(--ink);
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  display: flex; flex-direction: column;
+}
+
+/* 게이트 — 입력창 하나 */
+#gate { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+#gate[hidden] { display: none; }
+form {
+  width: 100%; max-width: 380px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: var(--shadow); padding: 18px;
+}
+.field { display: flex; gap: 8px; }
+#token {
+  flex: 1; min-width: 0; padding: 9px 11px;
+  border: 1px solid var(--line-2); border-radius: 8px;
+  background: var(--surface); color: var(--ink);
+  font: inherit; letter-spacing: .02em;
+}
+#token::placeholder { color: var(--ink-3); letter-spacing: 0; }
+#token:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+#open {
+  padding: 0 16px; border: none; border-radius: 8px; cursor: pointer;
+  background: var(--ink); color: var(--surface); font: inherit; font-weight: 500;
+}
+#open:disabled { opacity: .45; cursor: default; }
+#status { margin: 10px 2px 0; font-size: 12px; color: var(--ink-3); min-height: 1.3em; }
+#status.bad { color: var(--bad); }
+
+/* 뷰어 */
+#viewer { flex: 1; display: none; flex-direction: column; min-height: 0; }
+#viewer.on { display: flex; }
+#bar {
+  flex: none; display: flex; justify-content: flex-end;
+  padding: 4px 10px; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+#lock {
+  border: 1px solid var(--line-2); background: var(--surface-2); color: var(--ink-3);
+  border-radius: 6px; padding: 2px 10px; font: inherit; font-size: 11.5px; cursor: pointer;
+}
+#frame { flex: 1; border: 0; width: 100%; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <form id="form" autocomplete="off">
+    <div class="field">
+      <input id="token" type="password" autocomplete="off" spellcheck="false"
+             aria-label="GitHub Personal Access Token" placeholder="GitHub Personal Access Token">
+      <button id="open" type="submit">열기</button>
+    </div>
+    <div id="status" role="status"></div>
+  </form>
+</div>
+
+<div id="viewer">
+  <div id="bar"><button id="lock" type="button">잠그기</button></div>
+  <iframe id="frame" title="Paper Treasury Graph"></iframe>
+</div>
+
+<script>
+"use strict";
+/* 얇은 로더 — 내용의 정본은 비공개 저장소, 이 페이지는 껍데기다.
+   토큰은 메모리에만 두고 저장소·URL·로그 어디에도 남기지 않는다. */
+const OWNER = "expahn";
+const REPO = "paper-treasury";           // 비공개 정본 저장소
+const FILE = "vault/graph/index.html";   // 기본 브랜치 기준
+
+const $ = (id) => document.getElementById(id);
+const gate = $("gate"), viewer = $("viewer"), frame = $("frame");
+const tokenEl = $("token"), statusEl = $("status"), openBtn = $("open");
+
+function setStatus(msg, bad) { statusEl.textContent = msg; statusEl.className = bad ? "bad" : ""; }
+
+async function unlock(token) {
+  openBtn.disabled = true;
+  setStatus("여는 중…");
+  let res;
+  try {
+    res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE}`, {
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/vnd.github.raw+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    });
+  } catch (e) {
+    openBtn.disabled = false;
+    return setStatus("연결 실패 — 네트워크를 확인하세요.", true);
+  }
+  if (!res.ok) {
+    openBtn.disabled = false;
+    const map = {
+      401: "토큰이 유효하지 않습니다 (만료·오타·회수됨).",
+      403: "거부됨 — 요청 한도 초과이거나 토큰 권한(Contents: Read-only) 문제입니다.",
+      404: "이 토큰에 읽기 권한이 없거나, 파일이 기본 브랜치에 아직 없습니다.",
+    };
+    return setStatus(`${map[res.status] || "가져오기 실패"} (HTTP ${res.status})`, true);
+  }
+  const html = await res.text();
+  if (!html.includes("graph-data")) {   // 빈 응답을 성공으로 위장하지 않는다
+    openBtn.disabled = false;
+    return setStatus("응답이 그래프 문서가 아닙니다.", true);
+  }
+  frame.srcdoc = html;
+  gate.hidden = true;
+  viewer.classList.add("on");
+  setStatus("");
+}
+
+$("form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const t = tokenEl.value.trim();
+  if (!t) return setStatus("토큰을 입력하세요.", true);
+  unlock(t);
+});
+$("lock").addEventListener("click", () => {
+  frame.srcdoc = "";
+  tokenEl.value = "";
+  viewer.classList.remove("on");
+  gate.hidden = false;
+  openBtn.disabled = false;
+  setStatus("");
+  tokenEl.focus();
+});
+tokenEl.focus();
+</script>
+</body>
+</html>
