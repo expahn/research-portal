@@ -1,0 +1,419 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src 'self' https://api.github.com; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>notes</title>
+<style>
+:root{--bg:#f4efe4;--card:#faf7ee;--ink:#2b2620;--mut:#8a7c63;--hair:#d8cfbc;
+--navy:#1f3a5f;--burg:#8b1a1a;--gray:#a89b82;--yel:#fdf6d8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+font:15px/1.55 "Times New Roman",Times,"Malgun Gothic",Batang,serif;padding:18px 14px 60px}
+.wrap{max-width:1060px;margin:0 auto}
+h1{font-size:21px;margin:0 0 2px;font-weight:bold}
+.sub{color:var(--mut);font-size:12.5px;font-style:italic;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--hair);border-radius:6px;padding:14px 16px;margin:10px 0}
+.tabs{display:flex;gap:6px;margin:14px 0 4px;flex-wrap:wrap}
+.tab{border:1px solid var(--hair);background:var(--card);padding:6px 14px;border-radius:5px;cursor:pointer;font:inherit;font-size:14px}
+.tab.on{background:var(--navy);color:#f4efe4;border-color:var(--navy)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{border-bottom:1px solid var(--hair);padding:5px 8px;text-align:right;white-space:nowrap}
+th{color:var(--mut);font-weight:normal;font-size:12.5px}
+th:first-child,td:first-child{text-align:left}
+.b{font-weight:bold}.nv{color:var(--navy)}.bg{color:var(--burg)}.mut{color:var(--mut)}
+.small{font-size:12px;color:var(--mut)}
+input,select,textarea{font:inherit;font-size:13.5px;border:1px solid var(--hair);border-radius:4px;
+padding:5px 7px;background:#fff;color:var(--ink);max-width:100%}
+textarea{width:100%;min-height:44px}
+.btn{font:inherit;font-size:13.5px;border:1px solid var(--navy);background:var(--navy);color:#f4efe4;
+border-radius:5px;padding:6px 16px;cursor:pointer}
+.btn.sec{background:var(--card);color:var(--navy)}
+.btn:disabled{opacity:.45;cursor:default}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.err{color:var(--burg);font-size:13px;white-space:pre-wrap}
+.ok{color:var(--navy);font-size:13px}
+.badge{display:inline-block;border:1px solid var(--hair);border-radius:10px;padding:1px 9px;font-size:11.5px;color:var(--mut);margin-left:6px}
+.badge.warn{border-color:var(--burg);color:var(--burg)}
+.lockbox{max-width:460px;margin:8vh auto}
+details summary{cursor:pointer;color:var(--mut);font-size:12.5px}
+.tt{position:absolute;pointer-events:none;background:#fffef8;border:1px solid var(--hair);border-radius:5px;
+padding:7px 10px;font-size:12.5px;box-shadow:0 2px 8px rgba(0,0,0,.12);display:none;z-index:10;line-height:1.5}
+.legend{display:flex;gap:16px;font-size:12.5px;color:var(--mut);margin:4px 2px;flex-wrap:wrap}
+.sw{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-1px;margin-right:5px}
+@media(max-width:700px){th,td{padding:4px 5px;font-size:12.5px}}
+</style></head><body><div class="wrap">
+
+<h1>기록장 — 주간 금리 레인지 L0 + L1</h1>
+<div class="sub">L0(기계 밴드)는 자동 적립 · L1(재량 조정)은 여기서 입력 · 채점은 목표일 종가 도착 시 자동 —
+전망 vs 실제의 누적 대조와 원인 노트로 전망 정확도를 키우는 페이지</div>
+
+<div id="lock" class="card lockbox">
+  <div id="lockMsg" class="small" style="margin-bottom:8px">잠금 해제 — 비밀번호를 입력하세요.</div>
+  <div id="setupBox" style="display:none;margin-bottom:8px">
+    <div class="small" style="margin-bottom:6px">최초 설정: GitHub fine-grained 토큰(대상 저장소 research-data 만,
+    권한 Contents: Read&nbsp;and&nbsp;write)을 붙여넣고 비밀번호(<b>12자 이상</b>)를 정하세요. 토큰은 이 브라우저의
+    localStorage 에 <b>AES-GCM 으로 암호화</b>되어 저장되며 GitHub API 호출 외 어디로도 전송되지 않습니다.</div>
+    <input id="pat" type="password" placeholder="github_pat_..." style="width:100%;margin-bottom:6px" autocomplete="off">
+  </div>
+  <input id="pw" type="password" placeholder="비밀번호" style="width:100%" autocomplete="current-password">
+  <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+    <button class="btn" id="unlockBtn">열기</button>
+    <button class="btn sec" id="resetBtn" title="저장된 토큰 삭제 후 재설정">재설정</button>
+    <span id="lockErr" class="err"></span>
+  </div>
+  <details style="margin-top:12px"><summary>토큰 만드는 법</summary>
+  <div class="small">github.com → Settings → Developer settings → Fine-grained tokens → Generate new token →
+  Repository access: <b>Only select repositories → research-data</b> → Permissions → Repository permissions →
+  <b>Contents: Read and write</b> → Generate. 만료는 90일~1년 권장(만료 시 재설정으로 교체).</div></details>
+</div>
+
+<div id="app" style="display:none">
+  <div class="small" id="topline" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+    <span id="nowline"></span>
+    <span><span id="syncline"></span> <a href="#" id="relock" style="color:var(--mut)">잠금</a></span>
+  </div>
+  <div class="tabs">
+    <button class="tab on" data-t="week">이번 주</button>
+    <button class="tab" data-t="score">누적 채점</button>
+    <button class="tab" data-t="note">원인 노트</button>
+  </div>
+  <div id="t-week"></div>
+  <div id="t-score" style="display:none"></div>
+  <div id="t-note" style="display:none"></div>
+</div>
+<div class="tt" id="tt"></div>
+
+<script>
+"use strict";
+/* ============ 상수 ============ */
+const OWNER="expahn", REPO="research-data", BR="main";
+const P_JOURNAL="journal/l1_journal.jsonl", P_LEDGER="data/rr_oos_ledger.jsonl";
+const API="https://api.github.com/repos/"+OWNER+"/"+REPO;
+const CLS=["유가","미금리","정책커뮤니케이션","물가","성장지표","주식위험자산","수급","기타"];
+const CAUSE=["이벤트 서프라이즈","글로벌 금리","국내 정책","수급","물가·실물","기타"];
+const QS=["P10","P25","P50","P75","P90"], QP={P10:.10,P25:.25,P50:.50,P75:.75,P90:.90};
+const LSK="l1t.v1", IDLE_MS=30*60*1000, SIZE_CAP=900*1024;
+let TOKEN=null, LEDGER=[], JOURNAL=[], CURYIELD=null, idleT=null;
+
+/* ============ 유틸 ============ */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f1=x=>(x>=0?"+":"")+(+x).toFixed(1), f3=x=>(+x).toFixed(3);
+const b64e=u8=>{let s="";for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s)};
+const b64d=b=>{const s=atob(b.replace(/\n/g,""));const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u};
+const enc=s=>new TextEncoder().encode(s), dec=u=>new TextDecoder().decode(u);
+const todayISO=()=>{const d=new Date(Date.now()+9*3600e3);return d.toISOString().slice(0,10)};/* KST 기준 날짜 */
+const sortKeys=o=>Object.keys(o).sort().reduce((a,k)=>(a[k]=o[k],a),{});
+
+/* ============ 잠금 (PBKDF2 310k → AES-GCM) ============ */
+async function kdf(pw,salt){const km=await crypto.subtle.importKey("raw",enc(pw),"PBKDF2",false,["deriveKey"]);
+ return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:310000,hash:"SHA-256"},km,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);}
+async function sealPAT(pat,pw){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+ const k=await kdf(pw,salt);const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},k,enc(pat)));
+ localStorage.setItem(LSK,JSON.stringify({salt:b64e(salt),iv:b64e(iv),ct:b64e(ct)}));}
+async function openPAT(pw){const j=JSON.parse(localStorage.getItem(LSK));const k=await kdf(pw,b64d(j.salt));
+ return dec(new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(j.iv)},k,b64d(j.ct))));}
+function armIdle(){ clearTimeout(idleT); idleT=setTimeout(()=>{TOKEN=null;location.reload();},IDLE_MS); }
+["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev,()=>{if(TOKEN)armIdle();},{passive:true}));
+
+function lockInit(){
+ const has=!!localStorage.getItem(LSK);
+ $("#setupBox").style.display=has?"none":"block";
+ $("#lockMsg").textContent=has?"잠금 해제 — 비밀번호를 입력하세요.":"최초 설정이 필요합니다.";
+ $("#unlockBtn").onclick=async()=>{ $("#lockErr").textContent="";
+  try{
+   const pw=$("#pw").value; if(!pw)throw new Error("비밀번호를 입력하세요.");
+   if(!localStorage.getItem(LSK)){
+     if(pw.length<12)throw new Error("비밀번호는 12자 이상으로 하세요.");
+     const pat=$("#pat").value.trim(); if(!pat)throw new Error("토큰을 붙여넣으세요.");
+     await sealPAT(pat,pw); TOKEN=pat;
+   }else TOKEN=await openPAT(pw);
+   $("#pw").value="";$("#pat").value="";
+   armIdle(); await boot();
+  }catch(e){ $("#lockErr").textContent = e.name==="OperationError"?"비밀번호가 틀렸습니다.":("오류: "+e.message); }
+ };
+ $("#resetBtn").onclick=()=>{ if(confirm("저장된 토큰을 삭제하고 재설정할까요?")){localStorage.removeItem(LSK);lockInit();} };
+ $("#pw").addEventListener("keydown",e=>{if(e.key==="Enter")$("#unlockBtn").click()});
+}
+
+/* ============ GitHub API ============ */
+async function gh(path,opt){ const r=await fetch(API+path,Object.assign({headers:{
+  "Authorization":"Bearer "+TOKEN,"X-GitHub-Api-Version":"2022-11-28",
+  "Accept":(opt&&opt.raw)?"application/vnd.github.raw":"application/vnd.github+json"}},opt&&opt.init||{}));
+ if(r.status===404&&opt&&opt.ok404)return null;
+ if(!r.ok){const e=new Error("GitHub "+r.status+" — "+path.split("?")[0]+(r.status===401?" (토큰 만료/권한 확인)":""));
+  e.status=r.status; throw e;}
+ return (opt&&opt.raw)?r.text():r.json(); }
+async function readLedger(){ const t=await gh("/contents/"+P_LEDGER+"?ref="+BR,{raw:true});
+ return t.split("\n").filter(Boolean).map(JSON.parse).filter(d=>d.engine==="band_l0"); }
+/* 저널: 메타(sha·size)는 JSON 엔드포인트, 본문은 항상 raw — 1MB 초과 시 JSON content 가
+   비어 나오는 GitHub 한계 때문. (그때 base64 경로로 PUT 하면 파일이 조용히 잘린다.) */
+async function journalMeta(){ const j=await gh("/contents/"+P_JOURNAL+"?ref="+BR,{ok404:true});
+ if(j&&j.size>SIZE_CAP)throw new Error("저널이 "+Math.round(j.size/1024)+"KB — 900KB 임계 초과. 분할 필요(수동).");
+ return j; }
+async function readJournal(){ const j=await journalMeta(); if(!j)return[];
+ const t=await gh("/contents/"+P_JOURNAL+"?ref="+BR,{raw:true});
+ return t.split("\n").filter(Boolean).map(JSON.parse); }
+async function appendJournal(rows,msg){
+ for(let att=0;att<2;att++){
+  const j=await journalMeta();
+  const cur=j?await gh("/contents/"+P_JOURNAL+"?ref="+BR,{raw:true}):"";
+  const curLines=new Set(cur.split("\n").filter(Boolean));
+  /* l1 행은 최신 파일 기준으로 seq 재계산(다기기 중복 방지) */
+  for(const r of rows) if(r.kind==="l1"){
+    let n=0; for(const l of curLines){try{const d=JSON.parse(l);
+      if(d.kind==="l1"&&d.date===r.date&&d.tenor===r.tenor&&d.hz===r.hz)n++;}catch(e){}}
+    r.seq=n+1;
+  }
+  const lines=rows.map(r=>JSON.stringify(sortKeys(r))).filter(l=>!curLines.has(l)); /* 중복 append 방지 */
+  if(!lines.length)return;
+  const txt=cur+(cur&&!cur.endsWith("\n")?"\n":"")+lines.join("\n")+"\n";
+  const body={message:msg,content:b64e(enc(txt)),branch:BR}; if(j)body.sha=j.sha;
+  try{ await gh("/contents/"+P_JOURNAL,{init:{method:"PUT",body:JSON.stringify(body)}}); return; }
+  catch(e){ if(att===1||!(e.status===409||e.status===422))throw e; } /* sha 경합만 1회 재시도 */
+ }}
+
+/* ============ 조인·채점 (scripts/score_l1_overlay.py 와 동일 규약) ============ */
+function latestPred(){ const m={};
+ for(const r of LEDGER) if(r.kind==="prediction"){ const k=r.tenor+"|"+r.horizon;
+  if(!m[k]||r.as_of>m[k].as_of)m[k]=r; } return m; }
+function predsAll(){ const m={};
+ for(const r of LEDGER){ const k=r.kind+"|"+r.as_of+"|"+r.tenor+"|"+r.horizon; m[k]=r; } return m; }
+/* jsonl 규약: applied 부재=1 · applies_to 필수(부재 행은 채점 제외, 파이썬과 동일) ·
+   목표일 이후 입력(ts) 제외 = look-ahead 가드 */
+function cumL1(asof,tenor,hz,target){ let lo=0,hi=0;
+ for(const r of JOURNAL){ if(r.kind!=="l1")continue;
+  const ap=(r.applied==null?1:+r.applied); if(ap!==1)continue;
+  if(r.tenor!==tenor||r.hz!==hz)continue;
+  if(!r.applies_to||r.applies_to!==asof)continue;
+  if(target&&r.ts&&String(r.ts).slice(0,10)>String(target))continue;
+  lo+=r.lo;hi+=r.hi; }
+ return[lo,hi]; }
+function malformedL1(){ return JOURNAL.filter(r=>r.kind==="l1"&&!r.applies_to).length; }
+function shiftQ(q,lo,hi){ const p10=q.P10,p90=q.P90,span=p90-p10,o={};
+ for(const k of QS){const w=span===0?0:(q[k]-p10)/span;o[k]=q[k]+lo+(hi-lo)*w;} return o; }
+function pinball(q,dy){ let s=0; for(const k of QS)s+=(QP[k]-(dy<q[k]?1:0))*(dy-q[k]); return s/QS.length; }
+function pmLatest(){ const m={};
+ for(const r of JOURNAL) if(r.kind==="postmortem"){ const k=r.as_of+"|"+r.tenor+"|"+r.hz;
+  if(!m[k]||r.ts>m[k].ts)m[k]=r; } return m; }
+function scoredRows(){ const all=predsAll(),out=[];
+ for(const k in all){ if(!k.startsWith("score|"))continue; const s=all[k];
+  const p=all["prediction|"+s.as_of+"|"+s.tenor+"|"+s.horizon]; if(!p)continue;
+  const[lo,hi]=cumL1(s.as_of,s.tenor,s.horizon,p.target_date); const q1=shiftQ(p.q_bp,lo,hi);
+  out.push({as_of:s.as_of,tenor:s.tenor,hz:s.horizon,target:s.target_date,anchor:p.anchor,
+   q0:p.q_bp,q1,l1lo:lo,l1hi:hi,dy:s.realized_dy_bp,real:s.realized_lvl,
+   in0:p.q_bp.P10<=s.realized_dy_bp&&s.realized_dy_bp<=p.q_bp.P90,
+   in1:q1.P10<=s.realized_dy_bp&&s.realized_dy_bp<=q1.P90,
+   br0:s.realized_dy_bp>p.q_bp.P90?"upper":(s.realized_dy_bp<p.q_bp.P10?"lower":null),
+   pin0:pinball(p.q_bp,s.realized_dy_bp),pin1:pinball(q1,s.realized_dy_bp)});}
+ out.sort((a,b)=>a.as_of<b.as_of?-1:1); return out; }
+
+/* ============ 부트 ============ */
+async function boot(){
+ $("#lockErr").textContent="불러오는 중…";
+ [LEDGER,JOURNAL]=await Promise.all([readLedger(),readJournal()]);
+ try{const s=await(await fetch("summary.json",{cache:"no-store"})).json();
+   CURYIELD={y3:s.ktb.y3,y10:s.ktb.y10,asof:s.ktb.asof};}catch(e){CURYIELD=null;}
+ $("#lock").style.display="none"; $("#app").style.display="block";
+ $("#nowline").textContent=CURYIELD?("현재(민평 "+CURYIELD.asof+") 3Y "+f3(CURYIELD.y3)+" · 10Y "+f3(CURYIELD.y10)):"";
+ const bad=malformedL1();
+ $("#syncline").innerHTML="장부 band_l0 "+LEDGER.length+"행 · L1 "+JOURNAL.filter(r=>r.kind==="l1").length+"건 · 노트 "
+  +JOURNAL.filter(r=>r.kind==="postmortem").length+"건"
+  +(bad?' <span class="badge warn">applies_to 없는 L1 '+bad+'건 — 채점 제외</span>':"")+" ·";
+ renderWeek(); renderScore(); renderNote();
+}
+$("#relock").onclick=e=>{e.preventDefault();TOKEN=null;location.reload();};
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+ document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===b));
+ ["week","score","note"].forEach(t=>$("#t-"+t).style.display=(b.dataset.t===t?"":"none"));});
+
+/* ============ 탭 1 — 이번 주 ============ */
+function openAsofs(tenor,hz){ const today=todayISO();
+ return [...new Set(LEDGER.filter(r=>r.kind==="prediction"&&r.tenor===tenor&&r.horizon===hz
+  &&r.target_date>=today).map(r=>r.as_of))].sort().reverse(); }
+function renderWeek(){
+ const lp=latestPred();
+ let h='<div class="card"><table><thead><tr><th>셀</th><th>as-of</th><th>목표일</th>'
+  +'<th>L0 P10</th><th>L0 P50</th><th>L0 P90</th><th>L1 하단/상단</th><th class="b">최종 P10</th><th class="b">최종 P90</th><th>터치(지정가)</th></tr></thead><tbody>';
+ for(const tenor of["3Y","10Y"])for(const hz of["1W","1M"]){
+  const p=lp[tenor+"|"+hz]; if(!p)continue;
+  const[lo,hi]=cumL1(p.as_of,tenor,hz,p.target_date), q1=shiftQ(p.q_bp,lo,hi);
+  const lv=b=>f3(p.anchor+b/100), tl=b=>f3(p.anchor+p.touch_k*b/100);
+  h+='<tr><td class="b">'+esc(tenor)+' · '+esc(hz)+'</td><td>'+esc(p.as_of)+'</td><td>'+esc(p.target_date)+'</td>'
+   +'<td>'+lv(p.q_bp.P10)+'</td><td class="mut">'+lv(p.q_bp.P50)+'</td><td>'+lv(p.q_bp.P90)+'</td>'
+   +'<td>'+(lo||hi?('<span class="nv">'+f1(lo)+'</span> / <span class="bg">'+f1(hi)+'</span>'):'<span class="mut">—</span>')+'</td>'
+   +'<td class="b">'+lv(q1.P10)+'</td><td class="b">'+lv(q1.P90)+'</td>'
+   +'<td class="mut">'+tl(q1.P10)+' ~ '+tl(q1.P90)+'</td></tr>';
+ }
+ h+='</tbody></table><div class="small" style="margin-top:6px">최종 = L0 + 누적 L1(P10 에 하단, P90 에 상단, 내부 분위 비례이동 — 공식 채점기 scripts/score_l1_overlay.py 와 동일 산식·수치 검증 12/12).'
+  +' 명목 80% 밴드의 WF 실현: 1W 80.5/79.4% · 1M 78.4/79.8%(상단 이탈 명목의 1.3배).</div></div>';
+
+ h+='<div class="card"><div class="b" style="margin-bottom:8px">L1 조정 추가</div><div class="grid">'
+  +'<label>날짜<br><input id="f-date" type="date" value="'+todayISO()+'"></label>'
+  +'<label>대상<br><select id="f-tenor"><option>3Y</option><option>10Y</option></select></label>'
+  +'<label>지평<br><select id="f-hz"><option>1W</option><option>1M</option></select></label>'
+  +'<label>적용 스냅샷(as-of)<br><select id="f-ap"></select></label>'
+  +'<label>하단조정 bp<br><input id="f-lo" type="number" step="0.5" value="0"></label>'
+  +'<label>상단조정 bp<br><input id="f-hi" type="number" step="0.5" value="0"></label>'
+  +'<label>클래스<br><select id="f-cls">'+CLS.map(c=>'<option>'+esc(c)+'</option>').join('')+'</select></label>'
+  +'<label>반영<br><select id="f-ap1"><option value="1">1 — 적용</option><option value="0">0 — 기록만</option></select></label>'
+  +'</div><label style="display:block;margin-top:8px">사유<br><textarea id="f-why" placeholder="한 줄 근거 — 입력 시점에 쓸 것"></textarea></label>'
+  +'<div style="margin-top:8px;display:flex;gap:8px;align-items:center"><button class="btn" id="f-save">저장 (커밋)</button>'
+  +'<span id="f-msg" class="small"></span></div>'
+  +'<div class="small" style="margin-top:6px">클래스는 <b>입력 시점에</b> — 결과를 보고 붙인 라벨은 분석에서 제외됩니다. '
+  +'하단=상단 동일 이동은 레인지 조정이 아니라 방향 뷰(레벨 시프트)입니다. 저장은 비공개 저장소 journal/ 에 커밋되며 대시보드에는 표시되지 않습니다.</div></div>';
+ $("#t-week").innerHTML=h;
+ const refreshAp=()=>{ const as=openAsofs($("#f-tenor").value,$("#f-hz").value);
+  $("#f-ap").innerHTML=as.map((a,i)=>'<option'+(i===0?' selected':'')+'>'+esc(a)+'</option>').join('');
+  const none=!as.length;
+  $("#f-save").disabled=none;
+  $("#f-msg").innerHTML=none?'<span class="err">이 셀에 열려 있는 스냅샷이 없습니다(목표일 경과) — 다음 스냅샷 적립 후 입력하세요.</span>':''; };
+ $("#f-tenor").onchange=refreshAp; $("#f-hz").onchange=refreshAp; refreshAp();
+ $("#f-save").onclick=async()=>{
+  const b=$("#f-save");b.disabled=true;$("#f-msg").textContent="커밋 중…";
+  try{
+   const d=$("#f-date").value,t=$("#f-tenor").value,z=$("#f-hz").value,ap=$("#f-ap").value;
+   if(!ap)throw new Error("적용 스냅샷(as-of)이 없습니다 — 저장 불가.");
+   const pr=predsAll()["prediction|"+ap+"|"+t+"|"+z];
+   if(!pr)throw new Error("선택한 스냅샷 예측 행을 찾지 못했습니다.");
+   if(pr.target_date<todayISO())throw new Error("목표일이 지난 스냅샷에는 넣을 수 없습니다(look-ahead 금지).");
+   const row={kind:"l1",date:d,seq:1,tenor:t,hz:z,lo:+$("#f-lo").value,hi:+$("#f-hi").value,
+    why:$("#f-why").value.trim(),cls:$("#f-cls").value,applied:+$("#f-ap1").value,
+    applies_to:ap,
+    l0_lo_seen:pr.q_lvl&&pr.q_lvl.P10!=null?+pr.q_lvl.P10:null,
+    l0_hi_seen:pr.q_lvl&&pr.q_lvl.P90!=null?+pr.q_lvl.P90:null,
+    ts:new Date().toISOString()};
+   if(!row.why)throw new Error("사유를 입력하세요.");
+   if(row.lo===0&&row.hi===0)throw new Error("조정값이 0/0 입니다.");
+   await appendJournal([row],"L1: "+d+" "+t+" "+z+" "+f1(row.lo)+"/"+f1(row.hi)+"bp ["+row.cls+"]");
+   JOURNAL.push(row);$("#f-msg").innerHTML='<span class="ok">저장됨 ✓</span>';renderWeek();renderScore();
+  }catch(e){$("#f-msg").innerHTML='<span class="err">'+esc(e.message)+'</span>';b.disabled=false;return;}
+  b.disabled=false; };
+}
+
+/* ============ 탭 2 — 누적 채점 ============ */
+let SCSEL={tenor:"3Y",hz:"1W"};
+function renderScore(){
+ const rows=scoredRows(), el=$("#t-score");
+ let h='<div class="card">';
+ if(!rows.length){
+  h+='<div class="small">아직 채점된 예측이 없습니다. 첫 채점은 목표일 종가가 데이터에 도착하면 자동으로 생깁니다.</div></div>';
+  el.innerHTML=h;return;
+ }
+ const n=rows.length, c0=rows.filter(r=>r.in0).length/n, c1=rows.filter(r=>r.in1).length/n;
+ const p0=rows.reduce((a,r)=>a+r.pin0,0)/n, p1=rows.reduce((a,r)=>a+r.pin1,0)/n;
+ h+='<div style="display:flex;gap:26px;flex-wrap:wrap;font-size:14px">'
+  +'<span>채점 n <b>'+n+'</b><span class="badge">'+(n<60?'수집 중 — n&lt;60, 판정 금지(사전등록 동결)':'n≥60 — 판정은 공식 채점기(부트스트랩 CI)로')+'</span></span>'
+  +'<span>cov80 — L0 <b>'+(c0*100).toFixed(1)+'%</b> · L0+L1 <b>'+(c1*100).toFixed(1)+'%</b></span>'
+  +'<span>핀볼 — L0 <b>'+p0.toFixed(3)+'</b> · L0+L1 <b>'+p1.toFixed(3)+'</b> · Δ <b class="'+(p1<p0?'nv':'bg')+'">'+(p1-p0>=0?'+':'')+(p1-p0).toFixed(4)+'</b></span></div>';
+ const by={}; for(const r of JOURNAL) if(r.kind==="l1"&&(r.applied==null?1:+r.applied)===1){(by[r.cls]=by[r.cls]||[]).push((r.lo+r.hi)/2);}
+ h+='<table style="margin-top:10px"><thead><tr><th>클래스</th><th>n</th><th>평균 조정</th><th>|합|</th></tr></thead><tbody>';
+ for(const c of CLS){const v=by[c];if(!v)continue;
+  h+='<tr><td>'+esc(c)+'</td><td>'+v.length+'</td><td>'+f1(v.reduce((a,b)=>a+b,0)/v.length)+'bp</td><td>'+v.reduce((a,b)=>a+Math.abs(b),0).toFixed(0)+'bp</td></tr>';}
+ h+='</tbody></table><div class="small">클래스별 기여 판정은 공식 채점기의 leave-one-out 검정 + BH FDR q=0.10 통과분만 — 이 표는 서술 통계(사전등록 규칙).</div></div>';
+ h+='<div class="card"><div style="display:flex;gap:6px;margin-bottom:6px">'
+  +['3Y','10Y'].map(t=>'<button class="tab'+(SCSEL.tenor===t?' on':'')+'" data-sc-t="'+t+'">'+t+'</button>').join('')
+  +['1W','1M'].map(z=>'<button class="tab'+(SCSEL.hz===z?' on':'')+'" data-sc-z="'+z+'">'+z+'</button>').join('')
+  +'</div><div class="legend"><span><span class="sw" style="background:var(--gray);opacity:.45"></span>L0 80% 밴드</span>'
+  +'<span><span class="sw" style="background:none;border:2px solid var(--navy)"></span>L0+L1 밴드</span>'
+  +'<span><span class="sw" style="background:var(--ink);border-radius:50%"></span>실현 종가</span>'
+  +'<span class="bg">▲ 상단 이탈(약세)</span><span class="nv">▼ 하단 이탈(강세)</span></div>'
+  +'<div id="chart" style="position:relative"></div>'
+  +'<table style="margin-top:12px"><thead><tr><th>as-of</th><th>목표</th><th>L0 밴드</th><th>L1</th><th>최종 밴드</th>'
+  +'<th>실현</th><th>Δbp</th><th>L0 안?</th><th>최종 안?</th><th>핀볼0</th><th>핀볼1</th></tr></thead><tbody>';
+ for(const r of rows.filter(r=>r.tenor===SCSEL.tenor&&r.hz===SCSEL.hz)){
+  const lv=b=>f3(r.anchor+b/100);
+  h+='<tr><td>'+esc(r.as_of)+'</td><td>'+esc(r.target)+'</td><td>'+lv(r.q0.P10)+'~'+lv(r.q0.P90)+'</td>'
+   +'<td>'+(r.l1lo||r.l1hi?f1(r.l1lo)+'/'+f1(r.l1hi):'—')+'</td><td>'+lv(r.q1.P10)+'~'+lv(r.q1.P90)+'</td>'
+   +'<td class="b">'+f3(r.real)+'</td><td>'+f1(r.dy)+'</td>'
+   +'<td>'+(r.in0?'○':'<span class="'+(r.br0==="upper"?'bg':'nv')+'">✕'+(r.br0==="upper"?'▲':'▼')+'</span>')+'</td>'
+   +'<td>'+(r.in1?'○':'✕')+'</td><td>'+r.pin0.toFixed(3)+'</td><td>'+r.pin1.toFixed(3)+'</td></tr>';}
+ h+='</tbody></table></div>';
+ el.innerHTML=h;
+ el.querySelectorAll("[data-sc-t]").forEach(b=>b.onclick=()=>{SCSEL.tenor=b.dataset.scT;renderScore();});
+ el.querySelectorAll("[data-sc-z]").forEach(b=>b.onclick=()=>{SCSEL.hz=b.dataset.scZ;renderScore();});
+ drawChart(rows.filter(r=>r.tenor===SCSEL.tenor&&r.hz===SCSEL.hz));
+}
+function drawChart(rows){
+ const host=$("#chart"); if(!rows.length){host.innerHTML='<div class="small">이 셀의 채점 행이 아직 없습니다.</div>';return;}
+ const W=Math.min(host.clientWidth||980,980),H=300,L=52,R=14,T=12,B=26;
+ let lo=1e9,hi=-1e9;
+ for(const r of rows){lo=Math.min(lo,r.anchor+r.q1.P10/100,r.anchor+r.q0.P10/100,r.real);
+  hi=Math.max(hi,r.anchor+r.q1.P90/100,r.anchor+r.q0.P90/100,r.real);}
+ const pad=(hi-lo)*0.12||0.05; lo-=pad;hi+=pad;
+ const X=i=>L+(i+0.5)*(W-L-R)/rows.length, Y=v=>T+(hi-v)*(H-T-B)/(hi-lo);
+ let s='<svg width="'+W+'" height="'+H+'" style="max-width:100%">';
+ const step=(hi-lo)/4;
+ for(let i=0;i<=4;i++){const v=lo+i*step,y=Y(v);
+  s+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="#d8cfbc" stroke-width="1"/>'
+   +'<text x="'+(L-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="#8a7c63">'+v.toFixed(2)+'</text>';}
+ const bw=Math.min(26,(W-L-R)/rows.length*0.5);
+ rows.forEach((r,i)=>{const x=X(i);
+  s+='<rect x="'+(x-bw/2)+'" y="'+Y(r.anchor+r.q0.P90/100)+'" width="'+bw+'" height="'
+   +Math.max(1,Y(r.anchor+r.q0.P10/100)-Y(r.anchor+r.q0.P90/100))+'" fill="#a89b82" opacity="0.35" rx="3"/>';
+  s+='<rect x="'+(x-bw/2-2)+'" y="'+Y(r.anchor+r.q1.P90/100)+'" width="'+(bw+4)+'" height="'
+   +Math.max(1,Y(r.anchor+r.q1.P10/100)-Y(r.anchor+r.q1.P90/100))+'" fill="none" stroke="#1f3a5f" stroke-width="2" rx="3"/>';
+  s+='<line x1="'+(x-bw/2)+'" y1="'+Y(r.anchor)+'" x2="'+(x+bw/2)+'" y2="'+Y(r.anchor)+'" stroke="#8a7c63" stroke-width="1" stroke-dasharray="3,2"/>';
+  const out=!r.in1, col=out?(r.dy>0?"#8b1a1a":"#1f3a5f"):"#2b2620";
+  s+='<circle cx="'+x+'" cy="'+Y(r.real)+'" r="4.5" fill="'+col+'" stroke="#faf7ee" stroke-width="2"/>';
+  if(out)s+='<text x="'+x+'" y="'+(Y(r.real)+(r.dy>0?-9:16))+'" text-anchor="middle" font-size="10" fill="'+col+'">'+(r.dy>0?'▲':'▼')+'</text>';
+  s+='<text x="'+x+'" y="'+(H-8)+'" text-anchor="middle" font-size="10.5" fill="#8a7c63">'+esc(r.as_of.slice(5))+'</text>';
+  s+='<rect data-i="'+i+'" x="'+(x-(W-L-R)/rows.length/2)+'" y="'+T+'" width="'+((W-L-R)/rows.length)+'" height="'+(H-T-B)+'" fill="transparent"/>';
+ });
+ const last=rows[rows.length-1],lx=X(rows.length-1);
+ s+='<text x="'+Math.min(lx+bw,W-R-2)+'" y="'+(Y(last.anchor+last.q1.P90/100)-4)+'" font-size="10.5" fill="#1f3a5f">L0+L1</text>';
+ s+='</svg>';
+ host.innerHTML=s;
+ const tt=$("#tt");
+ host.querySelectorAll("rect[data-i]").forEach(rc=>{
+  rc.addEventListener("mousemove",ev=>{const r=rows[+rc.dataset.i],lv=b=>f3(r.anchor+b/100);
+   tt.style.display="block";tt.style.left=(ev.pageX+14)+"px";tt.style.top=(ev.pageY-10)+"px";
+   tt.innerHTML='<b>'+esc(r.as_of)+'</b> → '+esc(r.target)+'<br>L0 '+lv(r.q0.P10)+'~'+lv(r.q0.P90)
+    +'<br>L0+L1 '+lv(r.q1.P10)+'~'+lv(r.q1.P90)+'<br>실현 <b>'+f3(r.real)+'</b> ('+f1(r.dy)+'bp) '
+    +(r.in1?'밴드 안':'<span class="'+(r.dy>0?'bg':'nv')+'">이탈</span>')
+    +'<br>핀볼 '+r.pin0.toFixed(3)+' → '+r.pin1.toFixed(3);});
+  rc.addEventListener("mouseleave",()=>tt.style.display="none");});
+}
+
+/* ============ 탭 3 — 원인 노트 ============ */
+function renderNote(){
+ const rows=scoredRows().slice().reverse(), pm=pmLatest(), el=$("#t-note");
+ let h='<div class="card"><div class="b" style="margin-bottom:6px">채점 주간별 원인 노트</div>';
+ if(!rows.length)h+='<div class="small">채점이 시작되면 여기서 주간별로 "왜 맞았나/왜 벗어났나"를 기록합니다. 기록이 쌓이면 클래스별로 반복 원인을 집계합니다.</div>';
+ rows.forEach((r,i)=>{
+  const k=r.as_of+'|'+r.tenor+'|'+r.hz, note=pm[k], id='pm'+i;
+  const lv=b=>f3(r.anchor+b/100);
+  h+='<div style="border-top:1px solid var(--hair);padding:9px 0">'
+   +'<div><b>'+esc(r.tenor)+' · '+esc(r.hz)+'</b> '+esc(r.as_of)+' → '+esc(r.target)
+   +' · 최종 '+lv(r.q1.P10)+'~'+lv(r.q1.P90)+' · 실현 <b>'+f3(r.real)+'</b> ('+f1(r.dy)+'bp) '
+   +(r.in1?'<span class="ok">밴드 안</span>':'<span class="err">이탈 '+(r.dy>0?'▲약세':'▼강세')+'</span>')+'</div>'
+   +(note?'<div class="small" style="margin:4px 0">['+esc(note.cause_cls)+'] '+esc(note.note)+'</div>':'')
+   +'<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">'
+   +'<select id="'+id+'-c">'+CAUSE.map(c=>'<option'+(note&&note.cause_cls===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>'
+   +'<input id="'+id+'-n" style="flex:1;min-width:220px" placeholder="원인 한 줄 (없으면 \'예상 범위 내\')" value="'+(note?esc(note.note):'')+'">'
+   +'<button class="btn sec pm-save" data-id="'+id+'" data-asof="'+esc(r.as_of)+'" data-tenor="'+esc(r.tenor)
+   +'" data-hz="'+esc(r.hz)+'" data-target="'+esc(r.target)+'">저장</button></div></div>';
+ });
+ h+='</div>';
+ const notes=Object.values(pm).sort((a,b)=>a.ts<b.ts?1:-1);
+ if(notes.length){
+  h+='<div class="card"><div class="b">누적 교훈 (최신순)</div><table><thead><tr><th>as-of</th><th>셀</th><th>원인</th><th>노트</th></tr></thead><tbody>';
+  for(const n2 of notes)h+='<tr><td>'+esc(n2.as_of)+'</td><td>'+esc(n2.tenor)+' '+esc(n2.hz)+'</td><td>'+esc(n2.cause_cls)+'</td><td style="white-space:normal;text-align:left">'+esc(n2.note)+'</td></tr>';
+  h+='</tbody></table></div>';
+ }
+ el.innerHTML=h;
+ el.querySelectorAll(".pm-save").forEach(btn=>btn.addEventListener("click",async()=>{
+  const id=btn.dataset.id;
+  let note=$("#"+id+"-n").value.trim();
+  if(!note){ if(!confirm("노트가 비어 있습니다 — '예상 범위 내'로 저장할까요?"))return; note="예상 범위 내"; }
+  const row={kind:"postmortem",as_of:btn.dataset.asof,tenor:btn.dataset.tenor,hz:btn.dataset.hz,
+   target_date:btn.dataset.target,cause_cls:$("#"+id+"-c").value,note,ts:new Date().toISOString()};
+  btn.disabled=true;
+  try{ await appendJournal([row],"postmortem: "+row.as_of+" "+row.tenor+" "+row.hz);
+   JOURNAL.push(row);renderNote(); }catch(e){alert("저장 실패: "+e.message);btn.disabled=false;}
+ }));
+}
+
+lockInit();
+</script>
+<a href="index.html" id="portalBack" title="Bond Research Portal" style="position:fixed;right:16px;bottom:16px;z-index:99999;background:#1f3a5f;color:#f4efe4;font-family:'Times New Roman',Times,'Malgun Gothic',serif;font-size:13.5px;line-height:1;padding:10px 15px;border-radius:999px;text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,.28);opacity:.92">&#8592; Portal</a>
+</body></html>
