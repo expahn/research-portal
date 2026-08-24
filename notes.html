@@ -227,6 +227,13 @@ function malformedL1(){ return JOURNAL.filter(r=>r.kind==="l1"&&!r.applies_to).l
 function shiftQ(q,lo,hi){ const p10=q.P10,p90=q.P90,span=p90-p10,o={};
  for(const k of QS){const w=span===0?0:(q[k]-p10)/span;o[k]=q[k]+lo+(hi-lo)*w;} return o; }
 function pinball(q,dy){ let s=0; for(const k of QS)s+=(QP[k]-(dy<q[k]?1:0))*(dy-q[k]); return s/QS.length; }
+function qPos(q,dy){ /* 밴드 내 위치를 분위(P10~P90 구간별 선형보간)로 */
+ if(dy<q.P10)return "P10 밖(하단)"; if(dy>q.P90)return "P90 밖(상단)";
+ const ks=[["P10",10],["P25",25],["P50",50],["P75",75],["P90",90]];
+ for(let i=0;i<4;i++){const a=ks[i],b=ks[i+1];
+  if(dy<=q[b[0]]){const d=q[b[0]]-q[a[0]],w=d===0?0:(dy-q[a[0]])/d;
+   return "P"+Math.round(a[1]+w*(b[1]-a[1]));}}
+ return "P90"; }
 function pmLatest(){ const m={};
  for(const r of JOURNAL) if(r.kind==="postmortem"){ const k=r.as_of+"|"+r.tenor+"|"+r.hz;
   if(!m[k]||r.ts>m[k].ts)m[k]=r; } return m; }
@@ -236,8 +243,11 @@ function scoredRows(){ const all=predsAll(),out=[];
   const[lo,hi]=cumL1(s.as_of,s.tenor,s.horizon,p.target_date); const q1=shiftQ(p.q_bp,lo,hi);
   out.push({as_of:s.as_of,tenor:s.tenor,hz:s.horizon,target:s.target_date,anchor:p.anchor,
    q0:p.q_bp,q1,l1lo:lo,l1hi:hi,dy:s.realized_dy_bp,real:s.realized_lvl,
+   sig:p.sigma_bp,h:p.h,mu:p.mu_bp,dust:p.dust_bp,sfl:p.s_flow_bp,
    in0:p.q_bp.P10<=s.realized_dy_bp&&s.realized_dy_bp<=p.q_bp.P90,
    in1:q1.P10<=s.realized_dy_bp&&s.realized_dy_bp<=q1.P90,
+   in50_0:p.q_bp.P25<=s.realized_dy_bp&&s.realized_dy_bp<=p.q_bp.P75,
+   in50_1:q1.P25<=s.realized_dy_bp&&s.realized_dy_bp<=q1.P75,
    br0:s.realized_dy_bp>p.q_bp.P90?"upper":(s.realized_dy_bp<p.q_bp.P10?"lower":null),
    pin0:pinball(p.q_bp,s.realized_dy_bp),pin1:pinball(q1,s.realized_dy_bp)});}
  out.sort((a,b)=>a.as_of<b.as_of?-1:1); return out; }
@@ -294,20 +304,25 @@ function openAsofs(tenor,hz){ const today=todayISO();
   &&r.target_date>=today).map(r=>r.as_of))].sort().reverse(); }
 function renderWeek(){
  const lp=latestPred();
- let h='<div class="card"><table><thead><tr><th>셀</th><th>as-of</th><th>목표일</th>'
-  +'<th>L0 P10</th><th>L0 P50</th><th>L0 P90</th><th>L1 하단/상단</th><th class="b">최종 P10</th><th class="b">최종 P90</th><th>터치(지정가)</th></tr></thead><tbody>';
+ let h='<div class="card"><table><thead><tr><th>셀</th><th>as-of → 목표</th><th>중심 P50</th>'
+  +'<th class="b">전술 50% (P25~P75)</th><th class="b">리스크 80% (P10~P90)</th><th>L1</th><th>L0 80% (참조)</th><th>터치(지정가)</th></tr></thead><tbody>';
  for(const tenor of["3Y","10Y"])for(const hz of["1W","1M"]){
   const p=lp[tenor+"|"+hz]; if(!p)continue;
   const[lo,hi]=cumL1(p.as_of,tenor,hz,p.target_date), q1=shiftQ(p.q_bp,lo,hi);
   const lv=b=>f3(p.anchor+b/100), tl=b=>f3(p.anchor+p.touch_k*b/100);
-  h+='<tr><td class="b">'+esc(tenor)+' · '+esc(hz)+'</td><td>'+esc(p.as_of)+'</td><td>'+esc(p.target_date)+'</td>'
-   +'<td>'+lv(p.q_bp.P10)+'</td><td class="mut">'+lv(p.q_bp.P50)+'</td><td>'+lv(p.q_bp.P90)+'</td>'
+  const rng=(a,b)=>lv(a)+'~'+lv(b)+' <span class="small">('+(b-a).toFixed(0)+'bp)</span>';
+  h+='<tr><td class="b">'+esc(tenor)+' · '+esc(hz)+'</td><td>'+esc(p.as_of.slice(5))+' → '+esc(p.target_date.slice(5))+'</td>'
+   +'<td class="mut">'+lv(q1.P50)+'</td>'
+   +'<td class="b nv">'+rng(q1.P25,q1.P75)+'</td>'
+   +'<td class="b">'+rng(q1.P10,q1.P90)+'</td>'
    +'<td>'+(lo||hi?('<span class="nv">'+f1(lo)+'</span> / <span class="bg">'+f1(hi)+'</span>'):'<span class="mut">—</span>')+'</td>'
-   +'<td class="b">'+lv(q1.P10)+'</td><td class="b">'+lv(q1.P90)+'</td>'
+   +'<td class="mut">'+rng(p.q_bp.P10,p.q_bp.P90)+'</td>'
    +'<td class="mut">'+tl(q1.P10)+' ~ '+tl(q1.P90)+'</td></tr>';
  }
- h+='</tbody></table><div class="small" style="margin-top:6px">최종 = L0 + 누적 L1(P10 에 하단, P90 에 상단, 내부 분위 비례이동 — 공식 채점기 scripts/score_l1_overlay.py 와 동일 산식·수치 검증 12/12).'
-  +' 명목 80% 밴드의 WF 실현: 1W 80.5/79.4% · 1M 78.4/79.8%(상단 이탈 명목의 1.3배).</div></div>';
+ h+='</tbody></table><div class="small" style="margin-top:6px"><b>용도 구분</b> — 전술 50%: 중심 시나리오 레인지(포지션·롤 판단, 정상적으로 절반은 벗어남 — 이탈 자체는 신호 아님) ·'
+  +' 리스크 80%: 손절·경보 한계선 · 터치: 주중 고저 포괄(지정가 대역). 최종 = L0 + 누적 L1(P10 하단, P90 상단, 내부 분위 비례이동 —'
+  +' 공식 채점기 scripts/score_l1_overlay.py 와 동일 산식·수치 검증 12/12).'
+  +' 명목 80% 의 WF 실현: 1W 80.5/79.4% · 1M 78.4/79.8%(상단 이탈 명목의 1.3배).</div></div>';
 
  h+='<div class="card"><div class="b" style="margin-bottom:8px">L1 조정 추가</div><div class="grid">'
   +'<label>날짜<br><input id="f-date" type="date" value="'+todayISO()+'"></label>'
@@ -362,10 +377,12 @@ function renderScore(){
   el.innerHTML=h;return;
  }
  const n=rows.length, c0=rows.filter(r=>r.in0).length/n, c1=rows.filter(r=>r.in1).length/n;
+ const c50a=rows.filter(r=>r.in50_0).length/n, c50b=rows.filter(r=>r.in50_1).length/n;
  const p0=rows.reduce((a,r)=>a+r.pin0,0)/n, p1=rows.reduce((a,r)=>a+r.pin1,0)/n;
  h+='<div style="display:flex;gap:26px;flex-wrap:wrap;font-size:14px">'
   +'<span>채점 n <b>'+n+'</b><span class="badge">'+(n<60?'수집 중 — n&lt;60, 판정 금지(사전등록 동결)':'n≥60 — 판정은 공식 채점기(부트스트랩 CI)로')+'</span></span>'
   +'<span>cov80 — L0 <b>'+(c0*100).toFixed(1)+'%</b> · L0+L1 <b>'+(c1*100).toFixed(1)+'%</b></span>'
+  +'<span>cov50(전술) — L0 <b>'+(c50a*100).toFixed(1)+'%</b> · L0+L1 <b>'+(c50b*100).toFixed(1)+'%</b></span>'
   +'<span>핀볼 — L0 <b>'+p0.toFixed(3)+'</b> · L0+L1 <b>'+p1.toFixed(3)+'</b> · Δ <b class="'+(p1<p0?'nv':'bg')+'">'+(p1-p0>=0?'+':'')+(p1-p0).toFixed(4)+'</b></span></div>';
  const by={}; for(const r of JOURNAL) if(r.kind==="l1"&&(r.applied==null?1:+r.applied)===1){(by[r.cls]=by[r.cls]||[]).push((r.lo+r.hi)/2);}
  h+='<table style="margin-top:10px"><thead><tr><th>클래스</th><th>n</th><th>평균 조정</th><th>|합|</th></tr></thead><tbody>';
@@ -375,20 +392,22 @@ function renderScore(){
  h+='<div class="card"><div style="display:flex;gap:6px;margin-bottom:6px">'
   +['3Y','10Y'].map(t=>'<button class="tab'+(SCSEL.tenor===t?' on':'')+'" data-sc-t="'+t+'">'+t+'</button>').join('')
   +['1W','1M'].map(z=>'<button class="tab'+(SCSEL.hz===z?' on':'')+'" data-sc-z="'+z+'">'+z+'</button>').join('')
-  +'</div><div class="legend"><span><span class="sw" style="background:var(--gray);opacity:.45"></span>L0 80% 밴드</span>'
-  +'<span><span class="sw" style="background:none;border:2px solid var(--navy)"></span>L0+L1 밴드</span>'
+  +'</div><div class="legend"><span><span class="sw" style="background:var(--gray);opacity:.45"></span>L0 80%</span>'
+  +'<span><span class="sw" style="background:var(--navy);opacity:.16"></span>최종 50%(전술)</span>'
+  +'<span><span class="sw" style="background:none;border:2px solid var(--navy)"></span>최종 80%</span>'
   +'<span><span class="sw" style="background:var(--ink);border-radius:50%"></span>실현 종가</span>'
   +'<span class="bg">▲ 상단 이탈(약세)</span><span class="nv">▼ 하단 이탈(강세)</span></div>'
   +'<div id="chart" style="position:relative"></div>'
   +'<table style="margin-top:12px"><thead><tr><th>as-of</th><th>목표</th><th>L0 밴드</th><th>L1</th><th>최종 밴드</th>'
-  +'<th>실현</th><th>Δbp</th><th>L0 안?</th><th>최종 안?</th><th>핀볼0</th><th>핀볼1</th></tr></thead><tbody>';
+  +'<th>실현</th><th>Δbp</th><th>위치</th><th>L0 안?</th><th>최종 안?</th><th>50% 안?</th><th>핀볼0</th><th>핀볼1</th></tr></thead><tbody>';
  for(const r of rows.filter(r=>r.tenor===SCSEL.tenor&&r.hz===SCSEL.hz)){
   const lv=b=>f3(r.anchor+b/100);
   h+='<tr><td>'+esc(r.as_of)+'</td><td>'+esc(r.target)+'</td><td>'+lv(r.q0.P10)+'~'+lv(r.q0.P90)+'</td>'
    +'<td>'+(r.l1lo||r.l1hi?f1(r.l1lo)+'/'+f1(r.l1hi):'—')+'</td><td>'+lv(r.q1.P10)+'~'+lv(r.q1.P90)+'</td>'
-   +'<td class="b">'+f3(r.real)+'</td><td>'+f1(r.dy)+'</td>'
+   +'<td class="b">'+f3(r.real)+'</td><td>'+f1(r.dy)+'</td><td class="mut">'+qPos(r.q1,r.dy)+'</td>'
    +'<td>'+(r.in0?'○':'<span class="'+(r.br0==="upper"?'bg':'nv')+'">✕'+(r.br0==="upper"?'▲':'▼')+'</span>')+'</td>'
-   +'<td>'+(r.in1?'○':'✕')+'</td><td>'+r.pin0.toFixed(3)+'</td><td>'+r.pin1.toFixed(3)+'</td></tr>';}
+   +'<td>'+(r.in1?'○':'✕')+'</td><td>'+(r.in50_1?'○':'<span class="mut">✕</span>')+'</td>'
+   +'<td>'+r.pin0.toFixed(3)+'</td><td>'+r.pin1.toFixed(3)+'</td></tr>';}
  h+='</tbody></table></div>';
  el.innerHTML=h;
  el.querySelectorAll("[data-sc-t]").forEach(b=>b.onclick=()=>{SCSEL.tenor=b.dataset.scT;renderScore();});
@@ -412,6 +431,8 @@ function drawChart(rows){
  rows.forEach((r,i)=>{const x=X(i);
   s+='<rect x="'+(x-bw/2)+'" y="'+Y(r.anchor+r.q0.P90/100)+'" width="'+bw+'" height="'
    +Math.max(1,Y(r.anchor+r.q0.P10/100)-Y(r.anchor+r.q0.P90/100))+'" fill="#a89b82" opacity="0.35" rx="3"/>';
+  s+='<rect x="'+(x-bw/2)+'" y="'+Y(r.anchor+r.q1.P75/100)+'" width="'+bw+'" height="'
+   +Math.max(1,Y(r.anchor+r.q1.P25/100)-Y(r.anchor+r.q1.P75/100))+'" fill="#1f3a5f" opacity="0.16" rx="2"/>';
   s+='<rect x="'+(x-bw/2-2)+'" y="'+Y(r.anchor+r.q1.P90/100)+'" width="'+(bw+4)+'" height="'
    +Math.max(1,Y(r.anchor+r.q1.P10/100)-Y(r.anchor+r.q1.P90/100))+'" fill="none" stroke="#1f3a5f" stroke-width="2" rx="3"/>';
   s+='<line x1="'+(x-bw/2)+'" y1="'+Y(r.anchor)+'" x2="'+(x+bw/2)+'" y2="'+Y(r.anchor)+'" stroke="#8a7c63" stroke-width="1" stroke-dasharray="3,2"/>';
@@ -429,9 +450,10 @@ function drawChart(rows){
  host.querySelectorAll("rect[data-i]").forEach(rc=>{
   rc.addEventListener("mousemove",ev=>{const r=rows[+rc.dataset.i],lv=b=>f3(r.anchor+b/100);
    tt.style.display="block";tt.style.left=(ev.pageX+14)+"px";tt.style.top=(ev.pageY-10)+"px";
-   tt.innerHTML='<b>'+esc(r.as_of)+'</b> → '+esc(r.target)+'<br>L0 '+lv(r.q0.P10)+'~'+lv(r.q0.P90)
-    +'<br>L0+L1 '+lv(r.q1.P10)+'~'+lv(r.q1.P90)+'<br>실현 <b>'+f3(r.real)+'</b> ('+f1(r.dy)+'bp) '
-    +(r.in1?'밴드 안':'<span class="'+(r.dy>0?'bg':'nv')+'">이탈</span>')
+   tt.innerHTML='<b>'+esc(r.as_of)+'</b> → '+esc(r.target)+'<br>L0 80% '+lv(r.q0.P10)+'~'+lv(r.q0.P90)
+    +'<br>최종 80% '+lv(r.q1.P10)+'~'+lv(r.q1.P90)+'<br>최종 50% '+lv(r.q1.P25)+'~'+lv(r.q1.P75)
+    +'<br>실현 <b>'+f3(r.real)+'</b> ('+f1(r.dy)+'bp) '
+    +(r.in1?'위치 '+qPos(r.q1,r.dy):'<span class="'+(r.dy>0?'bg':'nv')+'">이탈</span>')
     +'<br>핀볼 '+r.pin0.toFixed(3)+' → '+r.pin1.toFixed(3);});
   rc.addEventListener("mouseleave",()=>tt.style.display="none");});
 }
@@ -439,15 +461,26 @@ function drawChart(rows){
 /* ============ 탭 3 — 원인 노트 ============ */
 function renderNote(){
  const rows=scoredRows().slice().reverse(), pm=pmLatest(), el=$("#t-note");
- let h='<div class="card"><div class="b" style="margin-bottom:6px">채점 주간별 원인 노트</div>';
- if(!rows.length)h+='<div class="small">채점이 시작되면 여기서 주간별로 "왜 맞았나/왜 벗어났나"를 기록합니다. 기록이 쌓이면 클래스별로 반복 원인을 집계합니다.</div>';
+ let h='<div class="card"><div class="b" style="margin-bottom:2px">채점 주간별 원인 노트</div>'
+  +'<div class="small" style="margin-bottom:6px">정량 맥락(크기·위치·엔진 기여)은 자동 산출 — 입력칸에는 시장 서사(왜 그랬는지)만 본인 판단으로 한 줄 기록합니다. 쌓이면 클래스별 반복 원인이 집계됩니다.</div>';
+ if(!rows.length)h+='<div class="small">채점이 시작되면 여기서 주간별로 "왜 맞았나/왜 벗어났나"를 기록합니다.</div>';
  rows.forEach((r,i)=>{
   const k=r.as_of+'|'+r.tenor+'|'+r.hz, note=pm[k], id='pm'+i;
   const lv=b=>f3(r.anchor+b/100);
+  /* 지평σ = 일간 EWMA σ × √h — 밴드 산식과 동일 스케일 (±1.28σ ≈ 80% 경계) */
+  const sigh=r.sig&&r.h?r.sig*Math.sqrt(r.h):null;
+  const auto='자동 요약: Δ'+f1(r.dy)+'bp'
+   +(sigh?' = '+(r.dy>=0?'+':'')+(r.dy/sigh).toFixed(1)+'σ(지평σ '+sigh.toFixed(1)+'bp)':'')
+   +' · 중심 P50('+f1(r.q1.P50)+') 대비 '+f1(r.dy-r.q1.P50)+'bp'
+   +' · 밴드 내 위치 '+qPos(r.q1,r.dy)
+   +(r.dust!=null?' · 엔진 중심: 간밤UST '+f1(r.dust)+'bp → '+f1(r.mu)+'bp':'')
+   +(r.sfl?' · 수급항 '+f1(r.sfl)+'bp':'')
+   +(r.l1lo||r.l1hi?' · L1 '+f1(r.l1lo)+'/'+f1(r.l1hi)+'bp 반영':'');
   h+='<div style="border-top:1px solid var(--hair);padding:9px 0">'
    +'<div><b>'+esc(r.tenor)+' · '+esc(r.hz)+'</b> '+esc(r.as_of)+' → '+esc(r.target)
    +' · 최종 '+lv(r.q1.P10)+'~'+lv(r.q1.P90)+' · 실현 <b>'+f3(r.real)+'</b> ('+f1(r.dy)+'bp) '
    +(r.in1?'<span class="ok">밴드 안</span>':'<span class="err">이탈 '+(r.dy>0?'▲약세':'▼강세')+'</span>')+'</div>'
+   +'<div class="small" style="margin:3px 0;color:var(--mut)">'+auto+'</div>'
    +(note?'<div class="small" style="margin:4px 0">['+esc(note.cause_cls)+'] '+esc(note.note)+'</div>':'')
    +'<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">'
    +'<select id="'+id+'-c">'+CAUSE.map(c=>'<option'+(note&&note.cause_cls===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>'
