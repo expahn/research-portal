@@ -215,13 +215,16 @@ function predsAll(){ const m={};
  for(const r of LEDGER){ const k=r.kind+"|"+r.as_of+"|"+r.tenor+"|"+r.horizon; m[k]=r; } return m; }
 /* jsonl 규약: applied 부재=1 · applies_to 필수(부재 행은 채점 제외, 파이썬과 동일) ·
    목표일 이후 입력(ts) 제외 = look-ahead 가드 */
-function cumL1(asof,tenor,hz,target){ let lo=0,hi=0;
+function l1Rows(asof,tenor,hz,target){ const out=[];
  for(const r of JOURNAL){ if(r.kind!=="l1")continue;
   const ap=(r.applied==null?1:+r.applied); if(ap!==1)continue;
   if(r.tenor!==tenor||r.hz!==hz)continue;
   if(!r.applies_to||r.applies_to!==asof)continue;
   if(target&&r.ts&&String(r.ts).slice(0,10)>String(target))continue;
-  lo+=r.lo;hi+=r.hi; }
+  out.push(r); }
+ return out; }
+function cumL1(asof,tenor,hz,target){ let lo=0,hi=0;
+ for(const r of l1Rows(asof,tenor,hz,target)){lo+=r.lo;hi+=r.hi;}
  return[lo,hi]; }
 function malformedL1(){ return JOURNAL.filter(r=>r.kind==="l1"&&!r.applies_to).length; }
 function shiftQ(q,lo,hi){ const p10=q.P10,p90=q.P90,span=p90-p10,o={};
@@ -241,8 +244,11 @@ function scoredRows(){ const all=predsAll(),out=[];
  for(const k in all){ if(!k.startsWith("score|"))continue; const s=all[k];
   const p=all["prediction|"+s.as_of+"|"+s.tenor+"|"+s.horizon]; if(!p)continue;
   const[lo,hi]=cumL1(s.as_of,s.tenor,s.horizon,p.target_date); const q1=shiftQ(p.q_bp,lo,hi);
+  /* 방향 콜 = 누적 틸트 (lo+hi)/2 의 부호 vs 실현의 기계중심(P50) 대비 부호 */
+  const tilt=(lo+hi)/2, rel=s.realized_dy_bp-p.q_bp.P50;
   out.push({as_of:s.as_of,tenor:s.tenor,hz:s.horizon,target:s.target_date,anchor:p.anchor,
    q0:p.q_bp,q1,l1lo:lo,l1hi:hi,dy:s.realized_dy_bp,real:s.realized_lvl,
+   tilt,wid:hi-lo,dirOK:(tilt!==0&&rel!==0)?((tilt>0)===(rel>0)):null,
    sig:p.sigma_bp,h:p.h,mu:p.mu_bp,dust:p.dust_bp,sfl:p.s_flow_bp,
    in0:p.q_bp.P10<=s.realized_dy_bp&&s.realized_dy_bp<=p.q_bp.P90,
    in1:q1.P10<=s.realized_dy_bp&&s.realized_dy_bp<=q1.P90,
@@ -304,24 +310,27 @@ function openAsofs(tenor,hz){ const today=todayISO();
   &&r.target_date>=today).map(r=>r.as_of))].sort().reverse(); }
 function renderWeek(){
  const lp=latestPred();
- let h='<div class="card"><table><thead><tr><th>셀</th><th>as-of → 목표</th><th>중심 P50</th>'
-  +'<th class="b">전술 50% (P25~P75)</th><th class="b">리스크 80% (P10~P90)</th><th>L1</th><th>L0 80% (참조)</th><th>터치(지정가)</th></tr></thead><tbody>';
+ let h='<div class="card"><table><thead><tr><th>셀</th><th>as-of → 목표</th><th>L0 중심</th>'
+  +'<th class="b">내 틸트(방향)</th><th class="b">최종 중심</th><th class="b">리스크 80% (P10~P90)</th><th>터치(지정가)</th></tr></thead><tbody>';
  for(const tenor of["3Y","10Y"])for(const hz of["1W","1M"]){
   const p=lp[tenor+"|"+hz]; if(!p)continue;
   const[lo,hi]=cumL1(p.as_of,tenor,hz,p.target_date), q1=shiftQ(p.q_bp,lo,hi);
+  const tilt=(lo+hi)/2, wid=hi-lo;
   const lv=b=>f3(p.anchor+b/100), tl=b=>f3(p.anchor+p.touch_k*b/100);
   const rng=(a,b)=>lv(a)+'~'+lv(b)+' <span class="small">('+(b-a).toFixed(0)+'bp)</span>';
+  const tiltH=tilt>0?'<span class="bg">+'+(+tilt).toFixed(1)+'bp ▲약세</span>'
+   :tilt<0?'<span class="nv">'+(+tilt).toFixed(1)+'bp ▼강세</span>'
+   :(wid?'<span class="mut">중립</span>':'<span class="mut">—</span>');
   h+='<tr><td class="b">'+esc(tenor)+' · '+esc(hz)+'</td><td>'+esc(p.as_of.slice(5))+' → '+esc(p.target_date.slice(5))+'</td>'
-   +'<td class="mut">'+lv(q1.P50)+'</td>'
-   +'<td class="b nv">'+rng(q1.P25,q1.P75)+'</td>'
-   +'<td class="b">'+rng(q1.P10,q1.P90)+'</td>'
-   +'<td>'+(lo||hi?('<span class="nv">'+f1(lo)+'</span> / <span class="bg">'+f1(hi)+'</span>'):'<span class="mut">—</span>')+'</td>'
-   +'<td class="mut">'+rng(p.q_bp.P10,p.q_bp.P90)+'</td>'
+   +'<td class="mut">'+lv(p.q_bp.P50)+'</td>'
+   +'<td class="b">'+tiltH+(wid?' <span class="small">폭'+f1(wid)+'bp</span>':'')+'</td>'
+   +'<td class="b nv">'+lv(q1.P50)+'</td>'
+   +'<td>'+rng(q1.P10,q1.P90)+'</td>'
    +'<td class="mut">'+tl(q1.P10)+' ~ '+tl(q1.P90)+'</td></tr>';
  }
- h+='</tbody></table><div class="small" style="margin-top:6px"><b>용도 구분</b> — 전술 50%: 중심 시나리오 레인지(포지션·롤 판단, 정상적으로 절반은 벗어남 — 이탈 자체는 신호 아님) ·'
-  +' 리스크 80%: 손절·경보 한계선 · 터치: 주중 고저 포괄(지정가 대역). 최종 = L0 + 누적 L1(P10 하단, P90 상단, 내부 분위 비례이동 —'
-  +' 공식 채점기 scripts/score_l1_overlay.py 와 동일 산식·수치 검증 12/12).'
+ h+='</tbody></table><div class="small" style="margin-top:6px"><b>구조</b> — 내 틸트 = 누적 L1 의 중심이동((하단+상단)/2): 기계 중심 대비 방향 콜이며,'
+  +' 작은 우위(51%)의 누적이 목표. 폭 조정(상단−하단)은 확신의 표현. 리스크 80% 는 손절·경보 한계, 터치는 주중 고저(지정가 대역).'
+  +' 적중률은 성적이 아니다 — 넓혀서 맞추기는 핀볼 점수가 폭에 비례해 처벌한다. 최종 = L0 + 누적 L1(공식 채점기 scripts/score_l1_overlay.py 와 동일 산식·수치 검증 12/12).'
   +' 명목 80% 의 WF 실현: 1W 80.5/79.4% · 1M 78.4/79.8%(상단 이탈 명목의 1.3배).</div></div>';
 
  h+='<div class="card"><div class="b" style="margin-bottom:8px">L1 조정 추가</div><div class="grid">'
@@ -377,37 +386,59 @@ function renderScore(){
   el.innerHTML=h;return;
  }
  const n=rows.length, c0=rows.filter(r=>r.in0).length/n, c1=rows.filter(r=>r.in1).length/n;
- const c50a=rows.filter(r=>r.in50_0).length/n, c50b=rows.filter(r=>r.in50_1).length/n;
  const p0=rows.reduce((a,r)=>a+r.pin0,0)/n, p1=rows.reduce((a,r)=>a+r.pin1,0)/n;
+ const iv=rows.filter(r=>r.l1lo||r.l1hi);                 /* 내가 개입한 셀 */
+ const win=iv.filter(r=>r.pin0-r.pin1>0).length;
+ const edge=iv.reduce((a,r)=>a+(r.pin0-r.pin1),0);        /* 누적 개선(양수=기계 대비 이득) */
+ const dir=rows.filter(r=>r.dirOK!=null), dw=dir.filter(r=>r.dirOK).length;
  h+='<div style="display:flex;gap:26px;flex-wrap:wrap;font-size:14px">'
   +'<span>채점 n <b>'+n+'</b><span class="badge">'+(n<60?'수집 중 — n&lt;60, 판정 금지(사전등록 동결)':'n≥60 — 판정은 공식 채점기(부트스트랩 CI)로')+'</span></span>'
-  +'<span>cov80 — L0 <b>'+(c0*100).toFixed(1)+'%</b> · L0+L1 <b>'+(c1*100).toFixed(1)+'%</b></span>'
-  +'<span>cov50(전술) — L0 <b>'+(c50a*100).toFixed(1)+'%</b> · L0+L1 <b>'+(c50b*100).toFixed(1)+'%</b></span>'
-  +'<span>핀볼 — L0 <b>'+p0.toFixed(3)+'</b> · L0+L1 <b>'+p1.toFixed(3)+'</b> · Δ <b class="'+(p1<p0?'nv':'bg')+'">'+(p1-p0>=0?'+':'')+(p1-p0).toFixed(4)+'</b></span></div>';
- const by={}; for(const r of JOURNAL) if(r.kind==="l1"&&(r.applied==null?1:+r.applied)===1){(by[r.cls]=by[r.cls]||[]).push((r.lo+r.hi)/2);}
- h+='<table style="margin-top:10px"><thead><tr><th>클래스</th><th>n</th><th>평균 조정</th><th>|합|</th></tr></thead><tbody>';
- for(const c of CLS){const v=by[c];if(!v)continue;
-  h+='<tr><td>'+esc(c)+'</td><td>'+v.length+'</td><td>'+f1(v.reduce((a,b)=>a+b,0)/v.length)+'bp</td><td>'+v.reduce((a,b)=>a+Math.abs(b),0).toFixed(0)+'bp</td></tr>';}
- h+='</tbody></table><div class="small">클래스별 기여 판정은 공식 채점기의 leave-one-out 검정 + BH FDR q=0.10 통과분만 — 이 표는 서술 통계(사전등록 규칙).</div></div>';
+  +'<span class="mut">기계 상태 — cov80 '+(c0*100).toFixed(0)+'%(최종 '+(c1*100).toFixed(0)+'%) · 핀볼 '+p0.toFixed(3)+'</span></div>'
+  +'<div style="display:flex;gap:26px;flex-wrap:wrap;font-size:14px;margin-top:6px;padding:7px 10px;background:var(--yel);border-radius:5px">'
+  +'<span class="b">내 엣지</span>'
+  +'<span>개입 <b>'+iv.length+'</b>셀 · 핀볼 개선 <b>'+win+'/'+iv.length+'</b></span>'
+  +'<span>누적 Δ핀볼 <b class="'+(edge>=0?'nv':'bg')+'">'+(edge>=0?'+':'')+edge.toFixed(2)+'</b> <span class="small">(양수=기계 대비 이득)</span></span>'
+  +'<span>방향 콜 <b class="'+(dir.length&&dw*2>=dir.length?'nv':'bg')+'">'+dw+'/'+dir.length+'</b> 적중</span></div>';
+ /* 클래스별 부가가치 — 어떤 근거 유형이 기계 대비 돈이 됐는가 (판단 정합화의 원료) */
+ const byc={};
+ for(const r of rows){ if(!(r.l1lo||r.l1hi))continue;
+  const cls=[...new Set(l1Rows(r.as_of,r.tenor,r.hz,r.target).map(e=>e.cls||"기타"))];
+  for(const c of cls){ const b=(byc[c]=byc[c]||{cells:0,win:0,edge:0,dirn:0,dirw:0});
+   b.cells++; const d=r.pin0-r.pin1; if(d>0)b.win++; b.edge+=d;
+   if(r.dirOK!=null){b.dirn++; if(r.dirOK)b.dirw++;} } }
+ const pend={};
+ for(const r of JOURNAL) if(r.kind==="l1"&&(r.applied==null?1:+r.applied)===1&&r.applies_to){
+  if(!rows.some(x=>x.as_of===r.applies_to&&x.tenor===r.tenor&&x.hz===r.hz))
+   pend[r.cls||"기타"]=(pend[r.cls||"기타"]||0)+1; }
+ const allCls=[...new Set([...CLS.filter(c=>byc[c]||pend[c]),...Object.keys(byc),...Object.keys(pend)])];
+ if(allCls.length){
+  h+='<table style="margin-top:10px"><thead><tr><th>클래스</th><th>채점 셀</th><th>개선</th><th>Δ핀볼 누적</th><th>방향</th><th>대기</th></tr></thead><tbody>';
+  for(const c of allCls){const b=byc[c];
+   h+='<tr><td>'+esc(c)+'</td><td>'+(b?b.cells:0)+'</td><td>'+(b?b.win+'/'+b.cells:'—')+'</td>'
+    +'<td>'+(b?'<span class="'+(b.edge>=0?'nv':'bg')+'">'+(b.edge>=0?'+':'')+b.edge.toFixed(2)+'</span>':'—')+'</td>'
+    +'<td>'+(b&&b.dirn?b.dirw+'/'+b.dirn:'—')+'</td><td class="mut">'+(pend[c]||0)+'</td></tr>';}
+  h+='</tbody></table>';
+ }
+ h+='<div class="small">한 셀에 복수 클래스가 개입하면 각 클래스에 공동 귀속(서술 통계). 공식 판정은 채점기 leave-one-out 검정 + BH FDR q=0.10 통과분만 — n≥60 부터(사전등록 규칙).</div></div>';
  h+='<div class="card"><div style="display:flex;gap:6px;margin-bottom:6px">'
   +['3Y','10Y'].map(t=>'<button class="tab'+(SCSEL.tenor===t?' on':'')+'" data-sc-t="'+t+'">'+t+'</button>').join('')
   +['1W','1M'].map(z=>'<button class="tab'+(SCSEL.hz===z?' on':'')+'" data-sc-z="'+z+'">'+z+'</button>').join('')
   +'</div><div class="legend"><span><span class="sw" style="background:var(--gray);opacity:.45"></span>L0 80%</span>'
-  +'<span><span class="sw" style="background:var(--navy);opacity:.16"></span>최종 50%(전술)</span>'
+  +'<span><span class="sw" style="background:var(--navy);opacity:.16"></span>중심 50% 구간(분포)</span>'
   +'<span><span class="sw" style="background:none;border:2px solid var(--navy)"></span>최종 80%</span>'
   +'<span><span class="sw" style="background:var(--ink);border-radius:50%"></span>실현 종가</span>'
   +'<span class="bg">▲ 상단 이탈(약세)</span><span class="nv">▼ 하단 이탈(강세)</span></div>'
   +'<div id="chart" style="position:relative"></div>'
-  +'<table style="margin-top:12px"><thead><tr><th>as-of</th><th>목표</th><th>L0 밴드</th><th>L1</th><th>최종 밴드</th>'
-  +'<th>실현</th><th>Δbp</th><th>위치</th><th>L0 안?</th><th>최종 안?</th><th>50% 안?</th><th>핀볼0</th><th>핀볼1</th></tr></thead><tbody>';
+  +'<table style="margin-top:12px"><thead><tr><th>as-of</th><th>목표</th><th>최종 밴드(80%)</th>'
+  +'<th>실현</th><th>Δbp</th><th>위치</th><th>내 틸트</th><th>방향</th><th>Δ핀볼</th><th>80% 안?</th></tr></thead><tbody>';
  for(const r of rows.filter(r=>r.tenor===SCSEL.tenor&&r.hz===SCSEL.hz)){
-  const lv=b=>f3(r.anchor+b/100);
-  h+='<tr><td>'+esc(r.as_of)+'</td><td>'+esc(r.target)+'</td><td>'+lv(r.q0.P10)+'~'+lv(r.q0.P90)+'</td>'
-   +'<td>'+(r.l1lo||r.l1hi?f1(r.l1lo)+'/'+f1(r.l1hi):'—')+'</td><td>'+lv(r.q1.P10)+'~'+lv(r.q1.P90)+'</td>'
+  const lv=b=>f3(r.anchor+b/100), d=r.pin0-r.pin1;
+  h+='<tr><td>'+esc(r.as_of)+'</td><td>'+esc(r.target)+'</td><td>'+lv(r.q1.P10)+'~'+lv(r.q1.P90)+'</td>'
    +'<td class="b">'+f3(r.real)+'</td><td>'+f1(r.dy)+'</td><td class="mut">'+qPos(r.q1,r.dy)+'</td>'
-   +'<td>'+(r.in0?'○':'<span class="'+(r.br0==="upper"?'bg':'nv')+'">✕'+(r.br0==="upper"?'▲':'▼')+'</span>')+'</td>'
-   +'<td>'+(r.in1?'○':'✕')+'</td><td>'+(r.in50_1?'○':'<span class="mut">✕</span>')+'</td>'
-   +'<td>'+r.pin0.toFixed(3)+'</td><td>'+r.pin1.toFixed(3)+'</td></tr>';}
+   +'<td>'+(r.tilt?'<span class="'+(r.tilt>0?'bg':'nv')+'">'+f1(r.tilt)+'</span>'+(r.wid?' <span class="small">폭'+f1(r.wid)+'</span>':''):(r.wid?'<span class="mut">폭'+f1(r.wid)+'</span>':'—'))+'</td>'
+   +'<td>'+(r.dirOK==null?'<span class="mut">—</span>':(r.dirOK?'○':'<span class="bg">✕</span>'))+'</td>'
+   +'<td>'+((r.l1lo||r.l1hi)?'<span class="'+(d>=0?'nv':'bg')+'">'+(d>=0?'+':'')+d.toFixed(2)+'</span>':'<span class="mut">—</span>')+'</td>'
+   +'<td>'+(r.in1?'○':'<span class="'+(r.dy>0?'bg':'nv')+'">✕'+(r.dy>0?'▲':'▼')+'</span>')+'</td></tr>';}
  h+='</tbody></table></div>';
  el.innerHTML=h;
  el.querySelectorAll("[data-sc-t]").forEach(b=>b.onclick=()=>{SCSEL.tenor=b.dataset.scT;renderScore();});
@@ -461,30 +492,38 @@ function drawChart(rows){
 /* ============ 탭 3 — 원인 노트 ============ */
 function renderNote(){
  const rows=scoredRows().slice().reverse(), pm=pmLatest(), el=$("#t-note");
- let h='<div class="card"><div class="b" style="margin-bottom:2px">채점 주간별 원인 노트</div>'
-  +'<div class="small" style="margin-bottom:6px">정량 맥락(크기·위치·엔진 기여)은 자동 산출 — 입력칸에는 시장 서사(왜 그랬는지)만 본인 판단으로 한 줄 기록합니다. 쌓이면 클래스별 반복 원인이 집계됩니다.</div>';
- if(!rows.length)h+='<div class="small">채점이 시작되면 여기서 주간별로 "왜 맞았나/왜 벗어났나"를 기록합니다.</div>';
+ let h='<div class="card"><div class="b" style="margin-bottom:2px">판단 복기 — 정합화 장부</div>'
+  +'<div class="small" style="margin-bottom:6px">목적은 적중 확인이 아니라 정산: 각 채점 셀에서 기계 대비 내 판단이 보탠/깎은 것(Δ핀볼·방향)을 확정하고,'
+  +' 입력 시점 근거와 결과를 대조해 다음 판단을 교정합니다. 정량은 자동 — 복기 한 줄만 본인 판단으로.</div>';
+ if(!rows.length)h+='<div class="small">채점이 시작되면 셀별 정산과 복기가 여기 쌓입니다.</div>';
  rows.forEach((r,i)=>{
   const k=r.as_of+'|'+r.tenor+'|'+r.hz, note=pm[k], id='pm'+i;
-  const lv=b=>f3(r.anchor+b/100);
+  const lv=b=>f3(r.anchor+b/100), d=r.pin0-r.pin1;
   /* 지평σ = 일간 EWMA σ × √h — 밴드 산식과 동일 스케일 (±1.28σ ≈ 80% 경계) */
   const sigh=r.sig&&r.h?r.sig*Math.sqrt(r.h):null;
-  const auto='자동 요약: Δ'+f1(r.dy)+'bp'
+  const auto='시장: Δ'+f1(r.dy)+'bp'
    +(sigh?' = '+(r.dy>=0?'+':'')+(r.dy/sigh).toFixed(1)+'σ(지평σ '+sigh.toFixed(1)+'bp)':'')
-   +' · 중심 P50('+f1(r.q1.P50)+') 대비 '+f1(r.dy-r.q1.P50)+'bp'
+   +' · 기계중심(P50 '+f1(r.q0.P50)+') 대비 '+f1(r.dy-r.q0.P50)+'bp'
    +' · 밴드 내 위치 '+qPos(r.q1,r.dy)
-   +(r.dust!=null?' · 엔진 중심: 간밤UST '+f1(r.dust)+'bp → '+f1(r.mu)+'bp':'')
-   +(r.sfl?' · 수급항 '+f1(r.sfl)+'bp':'')
-   +(r.l1lo||r.l1hi?' · L1 '+f1(r.l1lo)+'/'+f1(r.l1hi)+'bp 반영':'');
+   +(r.dust!=null?' · 엔진: 간밤UST '+f1(r.dust)+'bp → 중심 '+f1(r.mu)+'bp':'')
+   +(r.sfl?' · 수급항 '+f1(r.sfl)+'bp':'');
+  const ents=l1Rows(r.as_of,r.tenor,r.hz,r.target)
+   .map(e=>'['+esc(e.cls||'기타')+'] '+f1(e.lo)+'/'+f1(e.hi)+' — '+esc(e.why||'')).join(' · ');
+  const my=(r.l1lo||r.l1hi)?('<b>내 정산:</b> 틸트 '+f1(r.tilt)+'bp'+(r.wid?' · 폭 '+f1(r.wid)+'bp':'')
+   +(r.dirOK!=null?' · 방향 '+(r.dirOK?'<span class="nv">적중</span>':'<span class="bg">빗나감</span>'):'')
+   +' · Δ핀볼 <span class="'+(d>=0?'nv':'bg')+'">'+(d>=0?'+':'')+d.toFixed(2)+'</span>'
+   +(d>0?' (기계 대비 이득)':(d<0?' (기계 대비 손해)':''))
+   +(ents?'<br><span class="mut">입력 근거: '+ents+'</span>':'')):null;
   h+='<div style="border-top:1px solid var(--hair);padding:9px 0">'
    +'<div><b>'+esc(r.tenor)+' · '+esc(r.hz)+'</b> '+esc(r.as_of)+' → '+esc(r.target)
    +' · 최종 '+lv(r.q1.P10)+'~'+lv(r.q1.P90)+' · 실현 <b>'+f3(r.real)+'</b> ('+f1(r.dy)+'bp) '
    +(r.in1?'<span class="ok">밴드 안</span>':'<span class="err">이탈 '+(r.dy>0?'▲약세':'▼강세')+'</span>')+'</div>'
    +'<div class="small" style="margin:3px 0;color:var(--mut)">'+auto+'</div>'
+   +(my?'<div class="small" style="margin:3px 0">'+my+'</div>':'<div class="small" style="margin:3px 0;color:var(--mut)">내 개입 없음 — 기계 단독</div>')
    +(note?'<div class="small" style="margin:4px 0">['+esc(note.cause_cls)+'] '+esc(note.note)+'</div>':'')
    +'<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">'
    +'<select id="'+id+'-c">'+CAUSE.map(c=>'<option'+(note&&note.cause_cls===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>'
-   +'<input id="'+id+'-n" style="flex:1;min-width:220px" placeholder="원인 한 줄 (없으면 \'예상 범위 내\')" value="'+(note?esc(note.note):'')+'">'
+   +'<input id="'+id+'-n" style="flex:1;min-width:220px" placeholder="복기 한 줄 — 맞았다면 근거였나 운이었나, 틀렸다면 무엇을 놓쳤나" value="'+(note?esc(note.note):'')+'">'
    +'<button class="btn sec pm-save" data-id="'+id+'" data-asof="'+esc(r.as_of)+'" data-tenor="'+esc(r.tenor)
    +'" data-hz="'+esc(r.hz)+'" data-target="'+esc(r.target)+'">저장</button></div></div>';
  });
