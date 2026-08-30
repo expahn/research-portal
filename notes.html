@@ -60,9 +60,9 @@ padding:7px 10px;font-size:12.5px;box-shadow:0 2px 8px rgba(0,0,0,.12);display:n
     <button class="btn sec" id="resetBtn" title="저장된 토큰 삭제 후 재설정">재설정</button>
     <span id="lockErr" class="err"></span>
   </div>
-  <div class="small" style="margin-top:8px">여러 PC/브라우저를 쓰신다면: 한 기기에서 설정 후 상단의
-  <b>"기기동기화 발행"</b>을 켜면, 이후 다른 기기에서는 <b>비밀번호만</b>으로 개통됩니다
-  (암호화 봉인이 포털에 게시되는 방식 — 비밀번호 강도가 곧 보안입니다).</div>
+  <div class="small" style="margin-top:8px">여러 PC/브라우저를 쓰신다면 <b>기기마다 1회씩</b> 위 설정을 하세요.
+  봉인은 이 브라우저 안에만 있고 <b>어디로도 발행되지 않습니다</b> — 암호문이 공개 포털에 올라가는
+  경로는 이 페이지에 존재하지 않습니다.</div>
   <details style="margin-top:12px"><summary>토큰 만드는 법</summary>
   <div class="small">github.com → Settings → Developer settings → Fine-grained tokens → Generate new token →
   Repository access: <b>Only select repositories → research-data</b> → Permissions → Repository permissions →
@@ -122,27 +122,19 @@ async function openPAT(pw){let j;try{j=JSON.parse(localStorage.getItem(LSK));}
 function armIdle(){ clearTimeout(idleT); idleT=setTimeout(()=>{TOKEN=null;location.reload();},IDLE_MS); }
 ["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev,()=>{if(TOKEN)armIdle();},{passive:true}));
 
-let REMOTE_SEAL=null, SYNC_ON=false;
-async function probeRemoteSeal(){ try{const r=await fetch("l1seal.json",{cache:"no-store"});
-  if(r.ok){const j=await r.json(); if(j&&j.ct){SYNC_ON=true; return j;}} }catch(e){} return null; }
+/* 기기동기화 발행(원격 봉인)은 2026-08-30 제거됐다 — 암호문을 공개 포털로 내보내는 유일한 경로였다.
+   비활성이 아니라 코드 부재다: 탐침·상태·UI·PUT/DELETE 가 모두 없다. 봉인은 localStorage 에만 있다. */
 async function lockInit(){
  const has=!!localStorage.getItem(LSK);
- REMOTE_SEAL=await probeRemoteSeal();
- $("#setupBox").style.display=(has||REMOTE_SEAL)?"none":"block";
- $("#lockMsg").textContent=has?"잠금 해제 — 비밀번호를 입력하세요."
-  :(REMOTE_SEAL?"동기화 봉인 발견 — 비밀번호만 입력하면 이 기기가 개통됩니다."
-  :"최초 설정이 필요합니다.");
+ $("#setupBox").style.display=has?"none":"block";
+ $("#lockMsg").textContent=has?"잠금 해제 — 비밀번호를 입력하세요.":"최초 설정이 필요합니다.";
  $("#unlockBtn").onclick=async()=>{ $("#lockErr").textContent="";
   try{
    const pw=$("#pw").value; if(!pw)throw new Error("비밀번호를 입력하세요.");
    if(!localStorage.getItem(LSK)){
-     if(REMOTE_SEAL){ TOKEN=await unseal(REMOTE_SEAL,pw);
-       localStorage.setItem(LSK,JSON.stringify(REMOTE_SEAL)); }   /* 개통: 원격 봉인을 로컬 캐시 */
-     else{
-       if(pw.length<12)throw new Error("비밀번호는 12자 이상으로 하세요.");
-       const pat=$("#pat").value.trim(); if(!pat)throw new Error("토큰을 붙여넣으세요.");
-       await sealPAT(pat,pw); TOKEN=pat;
-     }
+     if(pw.length<12)throw new Error("비밀번호는 12자 이상으로 하세요.");
+     const pat=$("#pat").value.trim(); if(!pat)throw new Error("토큰을 붙여넣으세요.");
+     await sealPAT(pat,pw); TOKEN=pat;
    }else TOKEN=await openPAT(pw);
    $("#pw").value="";$("#pat").value="";
    armIdle(); await boot();
@@ -277,37 +269,10 @@ async function boot(){
  const bad=malformedL1();
  $("#syncline").innerHTML="장부 band_l0 "+LEDGER.length+"행 · L1 "+JOURNAL.filter(r=>r.kind==="l1").length+"건 · 노트 "
   +JOURNAL.filter(r=>r.kind==="postmortem").length+"건"
-  +(bad?' <span class="badge warn">applies_to 없는 L1 '+bad+'건 — 채점 제외</span>':"")
-  +' · <a href="#" id="syncTog" style="color:var(--mut)">'+(SYNC_ON?'기기동기화 해제':'기기동기화 발행')+'</a> ·';
+  +(bad?' <span class="badge warn">applies_to 없는 L1 '+bad+'건 — 채점 제외</span>':"")+' ·';
  renderWeek(); renderScore(); renderNote();
 }
 $("#relock").onclick=e=>{e.preventDefault();TOKEN=null;location.reload();};
-async function syncToggle(e){ e.preventDefault();
- try{
-  if(!SYNC_ON){
-   if(!confirm("기기 동기화 발행:\n암호화된 토큰 봉인(l1seal.json)이 공개 포털에 게시됩니다.\n"
-    +"암호문 자체는 공개되므로, 보안은 전적으로 비밀번호 강도에 걸립니다\n"
-    +"(사전 단어 조합이 아닌 16자+ 권장 · PBKDF2 60만 회 적용).\n"
-    +"발행 후 다른 기기에서는 비밀번호만으로 개통됩니다. 진행할까요?"))return;
-   const pw=prompt("비밀번호 재입력(봉인 생성 확인):"); if(!pw)return;
-   await openPAT(pw);                                     /* 오입력 방지 — 로컬 봉인으로 검증 */
-   const blob=await seal(TOKEN,pw,600000);
-   const meta=await gh("/contents/docs/l1seal.json?ref="+BR,{ok404:true});
-   const body={message:"sync: 기기동기화 봉인 발행",branch:BR,
-     content:b64e(enc(JSON.stringify(blob)))}; if(meta)body.sha=meta.sha;
-   await gh("/contents/docs/l1seal.json",{init:{method:"PUT",body:JSON.stringify(body)}});
-   SYNC_ON=true; alert("발행됨 — 다음 정기 빌드가 포털에 반영한 뒤부터 다른 기기에서 비밀번호만으로 열 수 있습니다.");
-  }else{
-   if(!confirm("동기화 해제: 공개 봉인을 삭제합니다. 이미 개통된 기기(로컬 캐시)는 계속 동작합니다."))return;
-   const meta=await gh("/contents/docs/l1seal.json?ref="+BR,{ok404:true});
-   if(meta)await gh("/contents/docs/l1seal.json",{init:{method:"DELETE",
-     body:JSON.stringify({message:"sync: 봉인 삭제",branch:BR,sha:meta.sha})}});
-   SYNC_ON=false; alert("삭제됨 — 다음 정기 빌드 후 포털에서 내려갑니다.");
-  }
-  const t=$("#syncTog"); if(t)t.textContent=SYNC_ON?"기기동기화 해제":"기기동기화 발행";
- }catch(err){alert("실패: "+(err.name==="OperationError"?"비밀번호가 틀렸습니다.":err.message));}
-}
-document.addEventListener("click",e=>{ if(e.target&&e.target.id==="syncTog")syncToggle(e); });
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===b));
  ["week","score","note"].forEach(t=>$("#t-"+t).style.display=(b.dataset.t===t?"":"none"));});
