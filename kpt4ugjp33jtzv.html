@@ -84,15 +84,13 @@ summary { cursor: pointer; color: var(--ink-3); font-size: 11.5px; }
 
 <div id="gate">
   <form id="form" autocomplete="off">
-    <div id="hint" class="small" style="margin-bottom:9px"></div>
-
     <input id="pat" type="password" autocomplete="off" spellcheck="false"
            aria-label="GitHub Personal Access Token" placeholder="GitHub 토큰 (github_pat_...)">
     <input id="pw" type="password" autocomplete="off" spellcheck="false"
            aria-label="비밀번호" placeholder="비밀번호 (12자 이상)">
 
     <label id="remwrap" for="rem">
-      <input id="rem" type="checkbox" checked>
+      <input id="rem" type="checkbox">
       <span class="small" id="remnote"></span>
     </label>
 
@@ -102,17 +100,6 @@ summary { cursor: pointer; color: var(--ink-3); font-size: 11.5px; }
     </div>
     <div id="status" role="status"></div>
 
-    <details>
-      <summary>토큰 만드는 법 · 권한</summary>
-      <div class="small" style="margin-top:6px">
-        github.com → Settings → Developer settings → Fine-grained tokens → Generate new token →
-        Repository access: <b>Only select repositories → paper-treasury</b> → Repository permissions →
-        <b>Contents: Read-only</b> → Generate. 쓰기 권한은 필요 없습니다.
-        다른 페이지의 토큰과 <b>별도 토큰</b>을 권장합니다 — 이 페이지는 읽기 전용이면 충분합니다.
-        토큰은 GitHub API 호출 헤더 외 어디로도 전송되지 않고, 저장하는 경우에도 암호문만 저장됩니다.
-        <b>마지막 조작 후 30분</b>이 지나면 자동으로 다시 잠깁니다. 그래프는 샌드박스 안에서 열리므로 <b>그래프 안에서의 조작은 시한을 늦추지 않습니다</b> — 그래프만 계속 보고 있어도 30분 뒤 잠깁니다.
-      </div>
-    </details>
   </form>
 </div>
 
@@ -143,7 +130,7 @@ const CRYPTO_OK = !!(window.crypto && window.crypto.subtle && window.crypto.subt
 const $ = (id) => document.getElementById(id);
 const gate = $("gate"), viewer = $("viewer"), frame = $("frame");
 const patEl = $("pat"), pwEl = $("pw"), remEl = $("rem"), remWrap = $("remwrap");
-const statusEl = $("status"), openBtn = $("open"), resetBtn = $("reset"), hintEl = $("hint");
+const statusEl = $("status"), openBtn = $("open"), resetBtn = $("reset");
 
 const enc = (s) => new TextEncoder().encode(s);
 const dec = (u) => new TextDecoder().decode(u);
@@ -198,9 +185,7 @@ function syncRem() {
   pwEl.disabled = !on;
   pwEl.placeholder = on ? "비밀번호 (12자 이상)" : "비밀번호 — 사용하지 않음";
   if (!on) pwEl.value = "";
-  $("remnote").textContent = on
-    ? "이 브라우저에 기억(암호화) — 토큰을 비밀번호로 봉인해 저장합니다. 다음부터는 비밀번호만 입력합니다."
-    : "기억 안 함 — 아무것도 저장하지 않습니다. 토큰은 이 탭의 메모리에만 있고 탭을 닫으면 사라집니다(비밀번호 불필요).";
+  $("remnote").textContent = on ? "이 브라우저에 기억" : "기억 안 함";
 }
 function renderMode() {
   const locked = hasSeal();
@@ -209,9 +194,6 @@ function renderMode() {
   resetBtn.hidden = !locked;
   pwEl.disabled = false;
   pwEl.placeholder = locked ? "비밀번호" : "비밀번호 (12자 이상)";
-  hintEl.textContent = locked
-    ? "잠금 해제 — 비밀번호를 입력하세요."
-    : "최초 설정 — GitHub 토큰(Contents: Read-only)과 비밀번호를 입력하세요.";
   if (!locked) syncRem();
   setStatus("");
   openBtn.disabled = false;
@@ -452,7 +434,7 @@ resetBtn.addEventListener("click", () => {
 $("lock").addEventListener("click", relock);
 
 renderMode();
-pwEl.focus();
+(hasSeal() ? pwEl : patEl).focus();
 </script>
 </body>
 </html>

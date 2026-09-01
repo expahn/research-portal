@@ -42,16 +42,14 @@ padding:7px 10px;font-size:12.5px;box-shadow:0 2px 8px rgba(0,0,0,.12);display:n
 @media(max-width:700px){th,td{padding:4px 5px;font-size:12.5px}}
 </style></head><body><div class="wrap">
 
+<div id="pagehead" style="display:none">
 <h1>기록장 — 주간 금리 레인지 L0 + L1</h1>
 <div class="sub">L0(기계 밴드)는 자동 적립 · L1(재량 조정)은 여기서 입력 · 채점은 목표일 종가 도착 시 자동 —
 전망 vs 실제의 누적 대조와 원인 노트로 전망 정확도를 키우는 페이지</div>
+</div>
 
 <div id="lock" class="card lockbox">
-  <div id="lockMsg" class="small" style="margin-bottom:8px">잠금 해제 — 비밀번호를 입력하세요.</div>
   <div id="setupBox" style="display:none;margin-bottom:8px">
-    <div class="small" style="margin-bottom:6px">최초 설정: GitHub fine-grained 토큰(대상 저장소 research-data 만,
-    권한 Contents: Read&nbsp;and&nbsp;write)을 붙여넣고 비밀번호(<b>12자 이상</b>)를 정하세요. 토큰은 이 브라우저의
-    localStorage 에 <b>AES-GCM 으로 암호화</b>되어 저장되며 GitHub API 호출 외 어디로도 전송되지 않습니다.</div>
     <input id="pat" type="password" placeholder="github_pat_..." style="width:100%;margin-bottom:6px" autocomplete="off">
   </div>
   <input id="pw" type="password" placeholder="비밀번호" style="width:100%" autocomplete="current-password">
@@ -60,13 +58,6 @@ padding:7px 10px;font-size:12.5px;box-shadow:0 2px 8px rgba(0,0,0,.12);display:n
     <button class="btn sec" id="resetBtn" title="저장된 토큰 삭제 후 재설정">재설정</button>
     <span id="lockErr" class="err"></span>
   </div>
-  <div class="small" style="margin-top:8px">여러 PC/브라우저를 쓰신다면 <b>기기마다 1회씩</b> 위 설정을 하세요.
-  봉인은 이 브라우저 안에만 있고 <b>어디로도 발행되지 않습니다</b> — 암호문이 공개 포털에 올라가는
-  경로는 이 페이지에 존재하지 않습니다.</div>
-  <details style="margin-top:12px"><summary>토큰 만드는 법</summary>
-  <div class="small">github.com → Settings → Developer settings → Fine-grained tokens → Generate new token →
-  Repository access: <b>Only select repositories → research-data</b> → Permissions → Repository permissions →
-  <b>Contents: Read and write</b> → Generate. 만료는 90일~1년 권장(만료 시 재설정으로 교체).</div></details>
 </div>
 
 <div id="app" style="display:none">
@@ -127,7 +118,6 @@ function armIdle(){ clearTimeout(idleT); idleT=setTimeout(()=>{TOKEN=null;locati
 async function lockInit(){
  const has=!!localStorage.getItem(LSK);
  $("#setupBox").style.display=has?"none":"block";
- $("#lockMsg").textContent=has?"잠금 해제 — 비밀번호를 입력하세요.":"최초 설정이 필요합니다.";
  $("#unlockBtn").onclick=async()=>{ $("#lockErr").textContent="";
   try{
    const pw=$("#pw").value; if(!pw)throw new Error("비밀번호를 입력하세요.");
@@ -264,7 +254,7 @@ async function boot(){
  [LEDGER,JOURNAL]=await Promise.all([readLedger(),readJournal()]);
  try{const s=await(await fetch("summary.json",{cache:"no-store"})).json();
    CURYIELD={y3:s.ktb.y3,y10:s.ktb.y10,asof:s.ktb.asof};}catch(e){CURYIELD=null;}
- $("#lock").style.display="none"; $("#app").style.display="block";
+ $("#lock").style.display="none"; $("#app").style.display="block"; $("#pagehead").style.display="block";
  $("#nowline").textContent=CURYIELD?("현재(민평 "+CURYIELD.asof+") 3Y "+f3(CURYIELD.y3)+" · 10Y "+f3(CURYIELD.y10)):"";
  const bad=malformedL1();
  $("#syncline").innerHTML="장부 band_l0 "+LEDGER.length+"행 · L1 "+JOURNAL.filter(r=>r.kind==="l1").length+"건 · 노트 "
