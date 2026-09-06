@@ -283,57 +283,73 @@ function normalizeDoc(html) {
   head = head.replace(new RegExp(TK + "(\\d+)" + TK, "g"), (_, i) => holes[+i]);
   return { html: head + tail, removed: removed };
 }
-/* ===== 준비 신호 = "파서 완주"가 아니라 "실제로 그려짐" (라운드4 F1) =====
-   프렐류드는 load 이후 2 rAF 시점에 기하(문서 높이·최대 canvas 의 CSS 박스·뷰포트)와
-   canvas 픽셀 표본(고유색 수·비지배 비율)을 함께 실어 보낸다. 판정은 전적으로 부모가 한다
-   — 아래 GEO 는 부모의 임계이고, 자식에는 폴링을 언제 멈출지의 힌트로만 같은 값이 들어간다.
-   한계(정직히): 이 장치는 **망가진 문서**를 잡지, **악의적 문서**를 잡지 못한다(문서가 값을
-   위조할 수 있다). 악의적 문서에 대한 신뢰 근거는 비공개 정본·SIG·sandbox·CSP 다. */
-/* 임계는 실측으로 정했다(측정 기록은 검증 트레일에) — 정본 13회·11구성의 최솟값 대비 여유:
-   canvas 고유색 col ≥3 (정본 최소 24) · 비지배비율 nd ≥0.02 (정본 최소 0.1033, 스피너 0.0043·
-   오류화면 0.0036 → 두 무리의 기하평균 0.021 근처) · 뷰포트 대비 면적 ≥1% (정본 최소 4.66%,
-   375px 폭의 45×299 캔버스가 하한) · 면적 ≥400px² · 문서 높이 ≥16px. */
+/* ===== 렌더 준비: legacy Canvas 픽셀 / protocol-v1 실제 draw 기록 =====
+   protocol-v1 뷰어는 정적 meta + 활성 canvas 표지와 성공한 draw 기록을 제공한다.
+   WebGL canvas 에 getContext("2d") 를 호출하지 않는다(미초기화 context 고정 방지).
+   GPU readback 없이 first draw 기록과 기하를 AND 로 확인하며 legacy 표본 기준은 유지한다.
+   한계: 기록과 기하는 망가진 뷰어의 탐지용이다. 악의적 문서의 위조를 막는 보안 증명은
+   아니며, 기존 비공개 정본·SIG·sandbox·CSP·message source 검증을 대체하지 않는다. */
+/* legacy 임계는 기존 실측 유지: 고유색 ≥3, 비지배비율 ≥0.02, 면적 ≥400px²,
+   뷰포트 대비 ≥1%, 문서 높이 ≥16px. modern 의 성긴 그래프는 draw 기록으로 판정한다. */
 const GEO = { minDocH: 16, minArea: 400, minFrac: 0.01, minCol: 3, minND: 0.02, sampleMs: 2500 };
+function renderEvidence(g) {
+  return g.protocol === 1 && g.t === "canvas"
+    && (g.mode === "webgl2" || g.mode === "canvas2d")
+    && g.rv === 1 && g.renderer === g.mode
+    && Number.isSafeInteger(g.frames) && g.frames > 0
+    && Number.isSafeInteger(g.nodes) && g.nodes > 0
+    && Number.isSafeInteger(g.rw) && g.rw > 0 && g.rw === g.aw
+    && Number.isSafeInteger(g.rh) && g.rh > 0 && g.rh === g.ah;
+}
 const PRELUDE = '<script>(function(){var sent=0,started=0,t0=0,n=0;'
-  + 'function probe(){var r={t:"none",w:0,h:0,aw:0,ah:0,col:-1,nd:-1,dh:0,vw:0,vh:0,n:0,dt:0};'
+  + 'var rendered=' + renderEvidence.toString() + ';'
+  + 'function probe(){var r={t:"none",w:0,h:0,aw:0,ah:0,col:-1,nd:-1,dh:0,vw:0,vh:0,n:0,dt:0,protocol:0,mode:"legacy"};'
   + 'try{r.dh=document.documentElement?document.documentElement.scrollHeight:0;'
   + 'r.vw=window.innerWidth||0;r.vh=window.innerHeight||0;'
-  + 'var cs=document.getElementsByTagName("canvas"),el=null,a=-1,i,b,s;'
+  + 'var marker=document.querySelector(\'meta[name="ptg-render-protocol"]\');'
+  + 'var mode=document.documentElement&&document.documentElement.dataset.graphRenderer;'
+  + 'r.protocol=marker?(marker.content==="1"?1:-1):(mode?1:0);'
+  + 'if(r.protocol)r.mode=mode==="webgl2"||mode==="canvas2d"?mode:"pending";'
+  + 'var cs=r.protocol?document.querySelectorAll(\'canvas[data-graph-canvas="1"]\'):document.getElementsByTagName("canvas"),el=null,a=-1,i,b,s;'
   + 'for(i=0;i<cs.length;i++){b=cs[i].getBoundingClientRect();s=b.width*b.height;'
   + 'if(s>a){a=s;el=cs[i];r.w=Math.round(b.width);r.h=Math.round(b.height);}}'
   + 'if(el){r.t="canvas";r.aw=el.width|0;r.ah=el.height|0;'
-  + 'try{var x=el.getContext&&el.getContext("2d");'
+  + 'if(r.protocol){var q=window.__PTG_RENDER_READY__;'
+  + 'if(q&&typeof q==="object"){r.rv=q.version;r.renderer=q.renderer==="webgl2"||q.renderer==="canvas2d"?q.renderer:"pending";'
+  + 'r.frames=q.frameCount;r.nodes=q.drawnNodes;r.rw=q.width;r.rh=q.height;}}'
+  + 'else{try{var x=el.getContext&&el.getContext("2d");'
   + 'if(x&&r.aw>0&&r.ah>0){var d=x.getImageData(0,0,r.aw,r.ah).data,m={},u=0,top=0,tot=0,j,k;'
   + 'for(j=0;j<d.length;j+=404){k=(d[j]>>4)+","+(d[j+1]>>4)+","+(d[j+2]>>4)+","+(d[j+3]>>6);tot++;'
   + 'if(m[k]===undefined){m[k]=0;u++;}m[k]++;if(m[k]>top)top=m[k];}'
-  + 'r.col=u;r.nd=tot?Math.round((1-top/tot)*1e4)/1e4:0;}}catch(e){r.col=-2;}'
+  + 'r.col=u;r.nd=tot?Math.round((1-top/tot)*1e4)/1e4:0;}}catch(e){r.col=-2;}}'
   + '}else if(document.body){b=document.body.getBoundingClientRect();r.t="body";'
   + 'r.w=Math.round(b.width);r.h=Math.round(b.height);}'
   + '}catch(e){}r.n=++n;r.dt=Date.now()-t0;return r;}'
   + 'function send(v){if(sent)return;sent=1;try{parent.postMessage({__gate:"ready",p:"paint",g:v},"*");}catch(e){}}'
   + 'function tick(){if(sent)return;var v=probe();'
-  + 'if((v.col>=' + GEO.minCol + '&&v.nd>=' + GEO.minND + ')||v.dt>=' + GEO.sampleMs + '||v.n>60)return send(v);'
+  + 'if(rendered(v)||(!v.protocol&&v.col>=' + GEO.minCol + '&&v.nd>=' + GEO.minND + ')||v.dt>=' + GEO.sampleMs + '||v.n>60)return send(v);'
   + 'setTimeout(tick,120);}'
   + 'function go(){if(started)return;started=1;t0=Date.now();'
   + 'if(window.requestAnimationFrame)requestAnimationFrame(function(){requestAnimationFrame(tick);});'
-  + 'setTimeout(tick,400);}'     /* 배경 탭에서는 rAF 가 멈춘다 — 타이머 폴백이 있어야 11구성이 산다 */
+  + 'setTimeout(tick,400);}'     /* 배경 탭에서는 rAF 가 멈춘다 — 타이머 폴백 유지 */
   + 'if(document.readyState==="complete")go();else window.addEventListener("load",go);'
   + '})();<' + '/script>';
 const READY_MS = 8000;
 let readyT = null, framePending = false;
-/* 퇴화값은 ready 로 인정하지 않는다 — 빈 문서·0×0 캔버스·기본치 300×150·칠해지지 않은
-   캔버스·사실상 한 색(스피너류)은 각각 다른 사유로 정직한 실패가 된다. */
 function degenerate(g) {
   if (!g || typeof g !== "object") return "준비 신호에 크기 정보가 없습니다";
+  if (![g.dh, g.w, g.h, g.aw, g.ah, g.vw, g.vh].every(Number.isFinite)) return "준비 신호의 크기 정보가 유효하지 않습니다";
   if (!(g.dh >= GEO.minDocH)) return "문서가 비어 있습니다 (높이 " + (g.dh | 0) + "px)";
   const area = (g.w || 0) * (g.h || 0);
   if (!(area >= GEO.minArea)) return (g.t === "canvas" ? "캔버스" : "본문") + " 크기가 0에 가깝습니다 (" + (g.w | 0) + "×" + (g.h | 0) + ")";
   if (g.t === "canvas" && g.w === 300 && g.h === 150 && g.aw === 300 && g.ah === 150) return "캔버스가 기본치(300×150) 그대로입니다";
   const vp = (g.vw || 0) * (g.vh || 0);
   if (vp > 0 && area < vp * GEO.minFrac) return "그려진 영역이 화면 대비 무의미합니다 (" + (g.w | 0) + "×" + (g.h | 0) + ")";
-  if (g.col >= 0) {
-    if (g.col < GEO.minCol) return "캔버스가 칠해지지 않았습니다";
-    if (g.nd < GEO.minND) return "캔버스가 사실상 한 색입니다 (비지배 " + g.nd + ")";
+  if (g.protocol) {
+    if (!renderEvidence(g)) return "그래프의 첫 렌더 완료 기록이 없거나 유효하지 않습니다";
+  } else if (g.t === "canvas") {
+    if (!(g.col >= GEO.minCol)) return "캔버스의 채색을 확인할 수 없습니다";
+    if (!(g.nd >= GEO.minND)) return "캔버스가 사실상 한 색입니다 (비지배 " + g.nd + ")";
   }
   return "";
 }
@@ -342,11 +358,11 @@ window.addEventListener("message", (ev) => {
   const d = ev.data;
   if (!d || d.__gate !== "ready") return;
   const bad = degenerate(d.g);
-  /* 크기·픽셀 표본만 남긴다(비밀도 내용도 아니다) — 감사·시험이 기계로 확인할 수 있게 */
+  /* 기하·draw 수·legacy 픽셀 표본만 남긴다 — 비밀·노드 내용은 보내지 않는다. */
   try { if (d.g && typeof d.g === "object") viewer.dataset.rgeom = JSON.stringify(d.g); } catch (e) { /* 무시 */ }
   if (bad) return renderFailed("문서는 받았지만 화면에 그려지지 않았습니다 (" + bad + ")");
   framePending = false; clearTimeout(readyT); readyT = null;
-  viewer.dataset.render = "ready";      /* 비밀이 아닌 상태 표시 — 감사·시험이 기계로 확인할 수 있게 */
+  viewer.dataset.render = "ready";
 });
 function renderFailed(why) {
   /* 빈 프레임을 열린 것처럼 두지 않는다 — 정직한 실패로 되돌린다(fail-closed). */
