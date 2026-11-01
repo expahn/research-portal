@@ -71,6 +71,7 @@ padding:7px 10px;font-size:12.5px;box-shadow:0 2px 8px rgba(0,0,0,.12);display:n
     <button class="tab" data-t="note">원인 노트</button>
   </div>
   <div id="t-week"></div>
+  <div id="release-context" class="card" style="display:none"></div>
   <div id="t-score" style="display:none"></div>
   <div id="t-note" style="display:none"></div>
 </div>
@@ -253,7 +254,9 @@ async function boot(){
  $("#lockErr").textContent="불러오는 중…";
  [LEDGER,JOURNAL]=await Promise.all([readLedger(),readJournal()]);
  try{const s=await(await fetch("summary.json",{cache:"no-store"})).json();
-   CURYIELD={y3:s.ktb.y3,y10:s.ktb.y10,asof:s.ktb.asof};}catch(e){CURYIELD=null;}
+   CURYIELD=s.ktb?{y3:s.ktb.y3,y10:s.ktb.y10,asof:s.ktb.asof}:null;
+   renderReleaseContext(s.kr?.release_diagnostics||s.regime?.release_diagnostics);
+ }catch(e){CURYIELD=null;}
  $("#lock").style.display="none"; $("#app").style.display="block"; $("#pagehead").style.display="block";
  $("#nowline").textContent=CURYIELD?("현재(민평 "+CURYIELD.asof+") 3Y "+f3(CURYIELD.y3)+" · 10Y "+f3(CURYIELD.y10)):"";
  const bad=malformedL1();
@@ -261,6 +264,27 @@ async function boot(){
   +JOURNAL.filter(r=>r.kind==="postmortem").length+"건"
   +(bad?' <span class="badge warn">applies_to 없는 L1 '+bad+'건 — 채점 제외</span>':"")+' ·';
  renderWeek(); renderScore(); renderNote();
+}
+function releaseCurrentForView(d, now=new Date()){
+ const day=x=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(x);
+ const stamp=new Date(d?.freshness?.checked_at||'');
+ return !!(d?.freshness?.assessment_allowed&&Number.isFinite(+stamp)&&day(stamp)===day(now)&&d.as_of===day(now));
+}
+function renderReleaseContext(d){
+ const box=document.getElementById('release-context'); if(!box||!d||!d.as_of)return;
+ const esc=v=>String(v??'미확인').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const pct=v=>Number.isFinite(v)?v.toFixed(1)+'%':'미확인';
+ const i=d.inflation||{},g=d.growth||{},c=i.facts||{},v=g.facts||{};
+ box.style.display='block';
+ const fresh=d.freshness||{},current=releaseCurrentForView(d),state={supported:'지지',contradicted:'반박',mixed:'혼재',insufficient_evidence:'자료 부족'};
+ const checks=(d.conditions||[]).map(x=>'<li>'+esc(x.scenario||x.id)+' — '+esc(current?(state[x.evaluation?.status]||'자료 부족'):'현재 판정 보류')
+   +(x.evaluation?.withheld_reason?' · '+esc(x.evaluation.withheld_reason):'')+'</li>').join('');
+ box.innerHTML='<b>물가·성장 발표 참고</b><div class="small">해석 기준 '+esc(d.as_of)+' · 과거 L1 판단에 소급 적용하지 않습니다.</div>'
+  +'<p class="small">갱신 확인 '+esc(fresh.checked_at)+' · '+esc(current?fresh.status:'withheld')+' · '+(current?'조건별 관찰 판정 가능':'현재 판단 보류 — 아래 수치는 해당 발표의 역사적 사실입니다.')+'</p>'
+  +'<p>물가 '+esc(i.official_release?.period)+' — 총물가 '+pct(c.headline_yoy_pct)+' / 근원 '+pct(c.core_yoy_pct)+' (전년비). 성장 '+esc(g.official_release?.period)+' — GDP '+pct(v.gdp_qoq_pct)+' (전기비).</p>'
+  +'<p class="small">기저효과·확산·민간 내수 구성을 확인한 뒤 L1 근거로 기록합니다. 근원 상승만으로 임금·기대 재전이, GDP 상승만으로 과열을 확정하지 않습니다. L0 밴드와 L1 입력값은 자동 변경하지 않습니다.</p>'
+  +(checks?'<ul class="small">'+checks+'</ul>':'')
+  +'<a href="korea_macro_dashboard.html#macro-release-diagnostics">세부 발표 진단</a> · <a href="rate_regime_dashboard.html#macro-release-diagnostics">국면 판단 조건</a>';
 }
 $("#relock").onclick=e=>{e.preventDefault();TOKEN=null;location.reload();};
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
@@ -523,3 +547,4 @@ lockInit();
 </script>
 <a href="index.html" id="portalBack" title="Bond Research Portal" style="position:fixed;right:16px;bottom:16px;z-index:99999;background:#1f3a5f;color:#f4efe4;font-family:'Times New Roman',Times,'Malgun Gothic',serif;font-size:13.5px;line-height:1;padding:10px 15px;border-radius:999px;text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,.28);opacity:.92">&#8592; Portal</a>
 </body></html>
+
