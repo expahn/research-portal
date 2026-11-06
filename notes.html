@@ -265,10 +265,11 @@ async function boot(){
   +(bad?' <span class="badge warn">applies_to 없는 L1 '+bad+'건 — 채점 제외</span>':"")+' ·';
  renderWeek(); renderScore(); renderNote();
 }
-function releaseCurrentForView(d, now=new Date()){
+function releaseCurrentForView(d, now=new Date(), topics=null){
  const day=x=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(x);
- const stamp=new Date(d?.freshness?.checked_at||'');
- return !!(d?.freshness?.assessment_allowed&&Number.isFinite(+stamp)&&day(stamp)===day(now)&&d.as_of===day(now));
+ const f=d?.freshness||{}, stamp=new Date(f.checked_at||'');
+ const allowed=topics&&f.topics ? topics.length>0&&topics.every(t=>f.topics[t]?.assessment_allowed===true) : f.assessment_allowed===true;
+ return !!(allowed&&Number.isFinite(+stamp)&&day(stamp)===day(now)&&d.as_of===day(now));
 }
 function renderReleaseContext(d){
  const box=document.getElementById('release-context'); if(!box||!d||!d.as_of)return;
@@ -276,12 +277,16 @@ function renderReleaseContext(d){
  const pct=v=>Number.isFinite(v)?v.toFixed(1)+'%':'미확인';
  const i=d.inflation||{},g=d.growth||{},c=i.facts||{},v=g.facts||{};
  box.style.display='block';
- const fresh=d.freshness||{},current=releaseCurrentForView(d),state={supported:'지지',contradicted:'반박',mixed:'혼재',insufficient_evidence:'자료 부족'};
- const checks=(d.conditions||[]).map(x=>'<li>'+esc(x.scenario||x.id)+' — '+esc(current?(state[x.evaluation?.status]||'자료 부족'):'현재 판정 보류')
-   +(x.evaluation?.withheld_reason?' · '+esc(x.evaluation.withheld_reason):'')+'</li>').join('');
- box.innerHTML='<b>물가·성장 발표 참고</b><div class="small">해석 기준 '+esc(d.as_of)+' · 과거 L1 판단에 소급 적용하지 않습니다.</div>'
-  +'<p class="small">갱신 확인 '+esc(fresh.checked_at)+' · '+esc(current?fresh.status:'withheld')+' · '+(current?'조건별 관찰 판정 가능':'현재 판단 보류 — 아래 수치는 해당 발표의 역사적 사실입니다.')+'</p>'
-  +'<p>물가 '+esc(i.official_release?.period)+' — 총물가 '+pct(c.headline_yoy_pct)+' / 근원 '+pct(c.core_yoy_pct)+' (전년비). 성장 '+esc(g.official_release?.period)+' — GDP '+pct(v.gdp_qoq_pct)+' (전기비).</p>'
+ const fresh=d.freshness||{},now=new Date(),state={supported:'지지',contradicted:'반박',mixed:'혼재',insufficient_evidence:'자료 부족'};
+ const topicState=key=>releaseCurrentForView(d,now,[key])?'원문 확인':'최신성 확인 대기';
+ const checks=(d.conditions||[]).map(x=>{
+   const ok=!x.evaluation?.withheld_reason&&releaseCurrentForView(d,now,x.evaluation_rule?.topics||['cpi','gdp']);
+   return '<li>'+esc(x.scenario||x.id)+' — '+esc(ok?(state[x.evaluation?.status]||'자료 부족'):'현재 판정 보류')
+     +(x.evaluation?.withheld_reason?' · '+esc(x.evaluation.withheld_reason):'')+'</li>';
+ }).join('');
+ box.innerHTML='<b>물가·성장 발표 참고</b><div class="small">진단 기준일 '+esc(d.as_of)+' · 과거 L1 판단에 소급 적용하지 않습니다.</div>'
+  +'<p class="small">원문 확인 시각 '+esc(fresh.checked_at)+'</p>'
+  +'<p>물가 측정월 '+esc(i.official_release?.period)+' ('+topicState('cpi')+') — 총물가 '+pct(c.headline_yoy_pct)+' / 근원 '+pct(c.core_yoy_pct)+' (전년비). 성장 측정분기 '+esc(g.official_release?.period)+' ('+topicState('gdp')+') — GDP '+pct(v.gdp_qoq_pct)+' (전기비).</p>'
   +'<p class="small">기저효과·확산·민간 내수 구성을 확인한 뒤 L1 근거로 기록합니다. 근원 상승만으로 임금·기대 재전이, GDP 상승만으로 과열을 확정하지 않습니다. L0 밴드와 L1 입력값은 자동 변경하지 않습니다.</p>'
   +(checks?'<ul class="small">'+checks+'</ul>':'')
   +'<a href="korea_macro_dashboard.html#macro-release-diagnostics">세부 발표 진단</a> · <a href="rate_regime_dashboard.html#macro-release-diagnostics">국면 판단 조건</a>';
